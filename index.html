@@ -1,0 +1,1576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FFCS Timetable Planner</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            vit: {
+              navy: '#0d2847',
+              blue: '#163f6e',
+              light: '#f1f5f9',
+              lime: '#c8f338'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- FontAwesome Icons & html2canvas -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+    .timetable-fixed {
+      table-layout: fixed !important;
+      width: 100% !important;
+      min-width: 1220px;
+      border-collapse: collapse;
+    }
+    .slot-cell {
+      height: 76px !important;
+      max-height: 76px !important;
+      width: 100%;
+      overflow: hidden;
+      position: relative;
+      cursor: pointer;
+      user-select: none;
+      transition: background-color 0.15s ease, filter 0.15s ease;
+    }
+    .slot-cell:hover:not(.occupied) {
+      background-color: rgba(59, 130, 246, 0.09);
+    }
+    .dark .slot-cell:hover:not(.occupied) {
+      background-color: rgba(255, 255, 255, 0.06);
+    }
+    .slot-cell.occupied:hover {
+      filter: brightness(0.92);
+      box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.35);
+    }
+    .vertical-lunch {
+      writing-mode: vertical-rl;
+      text-orientation: upright;
+      letter-spacing: 0.35rem;
+    }
+    .subject-title-lg {
+      font-size: 13px !important;
+      font-weight: 800 !important;
+      line-height: 1.15;
+      letter-spacing: -0.015em;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      word-break: break-word;
+    }
+    input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+    input[type="color"]::-webkit-color-swatch {
+      border: none;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-200">
+
+  <!-- Top App Bar -->
+  <header class="bg-[#0d2847] text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-[1760px] mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Brand & Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-300 shadow">
+          <i class="fa-solid fa-calendar-days text-base"></i>
+        </div>
+        <div>
+          <h1 class="text-base sm:text-lg font-extrabold tracking-tight flex items-center gap-2">
+            <span>FFCS Timetable Planner</span>
+            <span class="text-[10px] font-semibold font-mono bg-sky-500/20 text-sky-300 px-1.5 py-0.2 rounded border border-sky-400/30">PRO</span>
+          </h1>
+          <p class="text-[11px] text-blue-200/80">Physical Time-Slot Clash Protection • Undo History • Multi-Drafts</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center flex-wrap gap-2">
+        <!-- Undo Button -->
+        <button id="btn-undo" onclick="handleUndo()" class="px-2.5 py-1.5 rounded-md text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white/10" title="Undo Last Change (Ctrl+Z / Cmd+Z)" disabled>
+          <i class="fa-solid fa-rotate-left"></i>
+          <span>Undo</span>
+        </button>
+
+        <div class="h-4 w-[1px] bg-white/20 mx-1"></div>
+
+        <!-- Weekend Toggle -->
+        <button id="btn-toggle-weekend" onclick="toggleWeekends()" class="px-2.5 py-1.5 rounded-md text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1.5" title="Toggle Saturday & Sunday">
+          <i class="fa-regular fa-calendar"></i>
+          <span id="weekend-toggle-label">Show Sat & Sun</span>
+        </button>
+
+        <!-- Draft Actions -->
+        <button onclick="openDraftModal('duplicate')" class="px-2.5 py-1.5 rounded-md text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1.5" title="Duplicate current draft">
+          <i class="fa-regular fa-clone"></i>
+          <span>Duplicate</span>
+        </button>
+        <button onclick="openDraftModal('rename')" class="px-2.5 py-1.5 rounded-md text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1.5" title="Rename draft">
+          <i class="fa-solid fa-pen"></i>
+          <span>Rename</span>
+        </button>
+        <button onclick="triggerClearDraft()" class="px-2.5 py-1.5 rounded-md text-xs font-semibold bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 transition flex items-center gap-1.5" title="Clear all courses in this draft">
+          <i class="fa-solid fa-eraser"></i>
+          <span>Clear</span>
+        </button>
+        <button id="btn-delete-draft" onclick="triggerDeleteDraft()" class="px-2.5 py-1.5 rounded-md text-xs font-semibold bg-rose-500/20 text-rose-200 hover:bg-rose-500/30 transition flex items-center gap-1.5" title="Delete current draft">
+          <i class="fa-solid fa-trash-can"></i>
+          <span>Delete</span>
+        </button>
+
+        <div class="h-4 w-[1px] bg-white/20 mx-1"></div>
+
+        <!-- Capture -->
+        <button id="btn-capture" onclick="triggerCapture()" class="px-3 py-1.5 rounded-md text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition flex items-center gap-1.5">
+          <i class="fa-solid fa-camera"></i>
+          <span>Capture PNG</span>
+        </button>
+
+        <!-- Dark/Light Mode -->
+        <button onclick="toggleTheme()" class="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition text-sm w-8 h-8 flex items-center justify-center" title="Toggle Light/Dark Theme">
+          <i class="fa-solid fa-moon" id="theme-icon"></i>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Content Area -->
+  <main class="max-w-[1760px] mx-auto px-3 sm:px-4 py-4 flex-1 w-full space-y-4">
+
+    <!-- Draft Navigation Tabs -->
+    <div class="flex items-center justify-between border-b border-slate-300 dark:border-slate-800 pb-2 gap-2 overflow-x-auto">
+      <div id="drafts-tab-container" class="flex items-center gap-1.5">
+        <!-- Rendered dynamically -->
+      </div>
+      <button onclick="openDraftModal('new')" class="px-3 py-1.5 rounded-md text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition flex items-center gap-1.5 shrink-0 shadow-xs">
+        <i class="fa-solid fa-plus text-[10px]"></i>
+        <span>New Draft</span>
+      </button>
+    </div>
+
+    <!-- Guidance Note -->
+    <div class="bg-white dark:bg-slate-900 rounded-lg p-2.5 px-3.5 border border-slate-300 dark:border-slate-800 shadow-xs flex flex-wrap items-center justify-between text-xs gap-2">
+      <div class="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+        <i class="fa-solid fa-circle-info text-blue-600 dark:text-sky-400"></i>
+        <span>Click any cell to register a slot. <strong>Theory</strong> offers 3 cluster tiers (Single, Double, Triple). <strong>Lab</strong> is strictly a 2-period continuous session. <strong>Clash prevention active</strong>: you cannot schedule a lab if a theory class is already booked at that time!</span>
+      </div>
+      <div class="flex items-center gap-4 text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+        <span class="inline-flex items-center gap-1">
+          <span class="w-3 h-3 rounded bg-blue-100 dark:bg-blue-950/60 border border-blue-400"></span>
+          Theory: Top-Left
+        </span>
+        <span class="inline-flex items-center gap-1">
+          <span class="w-3 h-3 rounded bg-amber-100 dark:bg-amber-950/60 border border-amber-400"></span>
+          Lab: Bottom-Right
+        </span>
+      </div>
+    </div>
+
+    <!-- Timetable Card Container -->
+    <div class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+      
+      <!-- Table Header Bar: Displays Draft Name & Credit Metric -->
+      <div class="bg-[#0d2847] text-white px-4 py-2.5 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i class="fa-regular fa-calendar-check text-blue-300"></i>
+          <span id="display-draft-name" class="font-extrabold tracking-wide uppercase text-sm md:text-base">DRAFT 1</span>
+        </div>
+        <div class="flex items-center gap-3 text-xs">
+          <span class="bg-blue-900/60 border border-blue-400/30 px-2.5 py-1 rounded text-blue-200 font-medium">
+            Total Credits: <span id="metric-credits" class="font-bold text-white">0</span>
+          </span>
+          <span class="bg-blue-900/60 border border-blue-400/30 px-2.5 py-1 rounded text-blue-200 font-medium">
+            Courses: <span id="metric-courses" class="font-bold text-white">0</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Timetable Scroll Wrapper -->
+      <div id="timetable-capture-area" class="overflow-x-auto bg-white dark:bg-slate-900 p-2">
+        <table class="timetable-fixed border-collapse border border-slate-300 dark:border-slate-700 text-center text-xs">
+          <colgroup>
+            <col style="width: 5.5%;">   <!-- Day Column -->
+            <col style="width: 7.6%;">   <!-- P1 -->
+            <col style="width: 7.6%;">   <!-- P2 -->
+            <col style="width: 7.6%;">   <!-- P3 -->
+            <col style="width: 7.6%;">   <!-- P4 -->
+            <col style="width: 7.6%;">   <!-- P5 -->
+            <col style="width: 7.6%;">   <!-- P6 -->
+            <col style="width: 3.5%;">   <!-- LUNCH -->
+            <col style="width: 7.6%;">   <!-- P7 -->
+            <col style="width: 7.6%;">   <!-- P8 -->
+            <col style="width: 7.6%;">   <!-- P9 -->
+            <col style="width: 7.6%;">   <!-- P10 -->
+            <col style="width: 7.6%;">   <!-- P11 -->
+            <col style="width: 7.6%;">   <!-- P12 -->
+          </colgroup>
+
+          <thead>
+            <!-- Row 1: Theory Start -->
+            <tr class="bg-blue-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold border-b border-slate-300 dark:border-slate-700">
+              <th rowspan="4" class="border border-slate-300 dark:border-slate-700 text-center text-xs uppercase bg-blue-50 dark:bg-slate-800/80 p-1">
+                TIMINGS
+              </th>
+              <th colspan="6" class="border border-slate-300 dark:border-slate-700 py-0.5 text-center text-[11px] bg-blue-50 dark:bg-slate-800/60 text-blue-800 dark:text-blue-300 font-semibold">
+                MORNING SLOTS (THEORY / LAB)
+              </th>
+              <th rowspan="4" class="border border-slate-300 dark:border-slate-700 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 font-black text-xs p-0 w-8">
+                L<br>U<br>N<br>C<br>H
+              </th>
+              <th colspan="6" class="border border-slate-300 dark:border-slate-700 py-0.5 text-center text-[11px] bg-blue-50 dark:bg-slate-800/60 text-blue-800 dark:text-blue-300 font-semibold">
+                AFTERNOON / EVENING SLOTS (THEORY / LAB)
+              </th>
+            </tr>
+            <!-- Row 2: Theory Timings -->
+            <tr class="bg-blue-50 dark:bg-slate-800/70 text-[10px] text-slate-700 dark:text-slate-300 border-b border-slate-300 dark:border-slate-700">
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5 font-semibold">Th: 08:00 - 08:50</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5 font-semibold">Th: 08:55 - 09:45</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5 font-semibold">Th: 09:50 - 10:40</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5 font-semibold">Th: 10:45 - 11:35</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5 font-semibold">Th: 11:40 - 12:30</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5 font-semibold">Th: 12:35 - 13:25</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5 font-semibold">Th: 14:00 - 14:50</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5 font-semibold">Th: 14:55 - 15:45</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5 font-semibold">Th: 15:50 - 16:40</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5 font-semibold">Th: 16:45 - 17:35</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5 font-semibold">Th: 17:40 - 18:30</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5 font-semibold">Th: 18:35 - 19:25</th>
+            </tr>
+            <!-- Row 3: Lab Timings -->
+            <tr class="bg-blue-50/50 dark:bg-slate-800/40 text-[10px] text-slate-600 dark:text-slate-400 border-b border-slate-300 dark:border-slate-700">
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5">Lab: 08:00 - 08:50</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5">Lab: 08:50 - 09:40</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5">Lab: 09:50 - 10:40</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5">Lab: 10:40 - 11:30</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5">Lab: 11:40 - 12:30</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5">Lab: 12:30 - 13:20</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5">Lab: 14:00 - 14:50</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5">Lab: 14:50 - 15:40</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5">Lab: 15:50 - 16:40</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5">Lab: 16:40 - 17:30</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5">Lab: 17:40 - 18:30</th>
+              <th class="border border-slate-300 dark:border-slate-700 p-0.5">Lab: 18:30 - 19:20</th>
+            </tr>
+          </thead>
+
+          <tbody id="timetable-body">
+            <!-- Grid rows populated dynamically via JavaScript -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Registered Courses Summary Section -->
+    <div class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-4">
+      <div class="flex items-center justify-between mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2">
+          <i class="fa-solid fa-list-check text-blue-600 dark:text-blue-400"></i>
+          <span>Registered Courses in Active Draft</span>
+        </h2>
+        <span class="text-xs text-slate-500 dark:text-slate-400">Click a course row to edit or remove</span>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs border border-slate-200 dark:border-slate-700">
+          <thead class="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold uppercase text-[11px]">
+            <tr>
+              <th class="p-2.5 border-b border-r dark:border-slate-700 text-center w-12">Color</th>
+              <th class="p-2.5 border-b border-r dark:border-slate-700">Course Name</th>
+              <th class="p-2.5 border-b border-r dark:border-slate-700">Course Code</th>
+              <th class="p-2.5 border-b border-r dark:border-slate-700">Slots</th>
+              <th class="p-2.5 border-b border-r dark:border-slate-700">Type</th>
+              <th class="p-2.5 border-b border-r dark:border-slate-700">Faculty</th>
+              <th class="p-2.5 border-b border-r dark:border-slate-700">Venue</th>
+              <th class="p-2.5 border-b border-r dark:border-slate-700 text-center">Credits</th>
+              <th class="p-2.5 border-b dark:border-slate-700 text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="registered-courses-body" class="divide-y divide-slate-200 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+            <!-- Populated by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Slot Click / Course Configuration Modal -->
+  <div id="course-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl max-w-lg w-full overflow-hidden">
+      <div class="bg-[#0d2847] text-white px-5 py-3.5 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-graduation-cap text-blue-300"></i>
+          <h3 class="font-bold text-sm tracking-wide" id="modal-title">Configure Course Slot</h3>
+        </div>
+        <button onclick="closeCourseModal()" class="text-slate-300 hover:text-white text-lg leading-none">&times;</button>
+      </div>
+
+      <form id="course-form" class="p-5 space-y-4">
+        <!-- Selected Slot Context -->
+        <div class="bg-blue-50 dark:bg-slate-800 p-2.5 rounded-lg border border-blue-200 dark:border-slate-700 flex items-center justify-between text-xs">
+          <div>
+            <span class="text-slate-500 dark:text-slate-400">Position:</span>
+            <span id="modal-pos-info" class="font-bold text-slate-800 dark:text-slate-200 ml-1">MON - Period 1</span>
+          </div>
+          <div>
+            <span class="text-slate-500 dark:text-slate-400">Available:</span>
+            <span id="modal-slots-info" class="font-bold text-blue-600 dark:text-blue-400 ml-1">A1 / L1</span>
+          </div>
+        </div>
+
+        <!-- Course Title -->
+        <div>
+          <label class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+            Course Title <span class="text-rose-500">*</span>
+          </label>
+          <input type="text" id="course-name-input" required placeholder="e.g. Calculus for Engineers / Computer Networks" 
+            class="w-full text-xs px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold">
+        </div>
+
+        <!-- Slot Assignment Option Dropdown -->
+        <div>
+          <label class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1 flex items-center justify-between">
+            <span>Select Slot Option <span class="text-rose-500">*</span></span>
+            <span class="text-[10px] text-slate-400 font-normal">VIT Regulations</span>
+          </label>
+          <select id="slot-select-input" class="w-full text-xs px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono font-semibold" onchange="onSlotSelectChange(this.value)">
+            <!-- Options populated strictly based on rule: 3 Theory cluster tiers, Strictly 2-period lab -->
+          </select>
+          <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-1" id="slot-option-hint">
+            Theory offers Single, Double, or Triple cluster options. Lab is strictly a continuous 2-period session.
+          </p>
+        </div>
+
+        <!-- Course Code & Venue -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">Course Code (Optional)</label>
+            <input type="text" id="course-code-input" placeholder="e.g. MAT2001" 
+              class="w-full text-xs uppercase font-mono px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">Venue / Room (Optional)</label>
+            <input type="text" id="venue-name-input" placeholder="e.g. AB1-808" 
+              class="w-full text-xs px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+        </div>
+
+        <!-- Faculty Name & Credits -->
+        <div class="grid grid-cols-2 gap-3 items-center">
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">Faculty Name (Optional)</label>
+            <input type="text" id="faculty-name-input" placeholder="e.g. Dr. Raman" 
+              class="w-full text-xs px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">Credits</label>
+            <select id="credits-input" class="w-full text-xs px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold">
+              <option value="4">4 Credits (Theory + Tutorial / Lab)</option>
+              <option value="3" selected>3 Credits (Standard Theory)</option>
+              <option value="2">2 Credits (Lab / Project)</option>
+              <option value="1">1 Credit (Non-Credit / Seminar)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Slot Color Customization -->
+        <div class="pt-2 border-t border-slate-200 dark:border-slate-800">
+          <label class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+            <span>Slot Background Color</span>
+            <span class="text-[10px] text-slate-400 font-normal">Spectrum & Swatches</span>
+          </label>
+          <div class="flex items-center gap-2 flex-wrap">
+            <div id="swatch-list" class="flex items-center gap-1.5">
+              <!-- Swatches generated -->
+            </div>
+            <div class="h-5 w-[1px] bg-slate-300 dark:bg-slate-700 mx-1"></div>
+            <div class="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 px-2 rounded-md border border-slate-300 dark:border-slate-700">
+              <input type="color" id="spectrum-color-input" value="#c8f338" class="w-6 h-6 rounded cursor-pointer border-0 bg-transparent p-0" onchange="onCustomColorPick(this.value)">
+              <span id="hex-label" class="font-mono text-[11px] font-bold text-slate-700 dark:text-slate-300">#C8F338</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800">
+          <button type="button" id="btn-delete-course" onclick="triggerDeleteCourseFromModal()" class="px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition hidden">
+            <i class="fa-solid fa-trash-can mr-1"></i> Remove Course
+          </button>
+          <div class="flex items-center gap-2 ml-auto">
+            <button type="button" onclick="closeCourseModal()" class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition">
+              Cancel
+            </button>
+            <button type="submit" class="px-4 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow transition flex items-center gap-1.5">
+              <i class="fa-solid fa-check"></i>
+              <span id="btn-save-label">Save Course</span>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Draft Name Modal (In-App prompt replacement) -->
+  <div id="draft-name-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl max-w-sm w-full p-4 space-y-4">
+      <div class="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-sm">
+        <i id="draft-name-icon" class="fa-solid fa-folder-plus text-blue-500"></i>
+        <h3 id="draft-name-modal-title">Draft Name</h3>
+      </div>
+      <div>
+        <label id="draft-name-label" class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Enter name</label>
+        <input type="text" id="draft-name-input" maxlength="28" class="w-full text-xs font-semibold px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div class="flex justify-end gap-2 pt-1 border-t border-slate-200 dark:border-slate-800">
+        <button onclick="closeDraftModal()" class="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded font-medium">Cancel</button>
+        <button onclick="submitDraftNameModal()" class="px-4 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clash Warning Alert Modal (Strict Conflict Feedback) -->
+  <div id="clash-modal" class="fixed inset-0 bg-slate-900/65 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-900/60 rounded-xl shadow-2xl max-w-md w-full p-5 space-y-4 animate-scale-up">
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+          <i class="fa-solid fa-ban text-lg"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-extrabold text-rose-600 dark:text-rose-400 uppercase tracking-wide">Clash Detected!</h3>
+          <p class="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">You cannot attend two classes at once.</p>
+        </div>
+      </div>
+      <div id="clash-modal-content" class="bg-rose-50 dark:bg-rose-950/30 p-3 rounded-lg border border-rose-200 dark:border-rose-900/40 text-xs text-slate-700 dark:text-slate-300 leading-relaxed space-y-2">
+        <!-- Injected details -->
+      </div>
+      <div class="flex justify-end pt-1">
+        <button onclick="closeClashModal()" class="px-4 py-1.5 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition">
+          Understood
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom In-App Confirmation Modal -->
+  <div id="confirm-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl max-w-sm w-full p-5 space-y-4">
+      <div class="flex items-start gap-3">
+        <div class="w-9 h-9 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+          <i class="fa-solid fa-triangle-exclamation text-base"></i>
+        </div>
+        <div>
+          <h3 id="confirm-title" class="text-sm font-bold text-slate-900 dark:text-white">Confirm Action</h3>
+          <p id="confirm-message" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Are you sure you want to proceed?</p>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+        <button id="btn-confirm-cancel" class="px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">Cancel</button>
+        <button id="btn-confirm-action" class="px-4 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg">Proceed</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast-bar" class="fixed bottom-5 right-5 z-50 bg-slate-900 text-white text-xs px-4 py-2.5 rounded-lg shadow-2xl flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none border border-slate-700">
+    <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400"></i>
+    <span id="toast-text">Success</span>
+  </div>
+
+  <script>
+    /* =========================================================================
+       1. TIMETABLE SCHEDULE MATRIX & CLUSTERS
+       ========================================================================= */
+    const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI'];
+    const WEEKENDS = ['SAT', 'SUN'];
+    let showWeekends = false;
+
+    // Period timings labels for clash messages
+    const THEORY_TIMINGS = [
+      '08:00 - 08:50', '08:55 - 09:45', '09:50 - 10:40', '10:45 - 11:35', '11:40 - 12:30', '12:35 - 13:25',
+      '14:00 - 14:50', '14:55 - 15:45', '15:50 - 16:40', '16:45 - 17:35', '17:40 - 18:30', '18:35 - 19:25'
+    ];
+
+    const LAB_TIMINGS = [
+      '08:00 - 08:50', '08:50 - 09:40', '09:50 - 10:40', '10:40 - 11:30', '11:40 - 12:30', '12:30 - 13:20',
+      '14:00 - 14:50', '14:50 - 15:40', '15:50 - 16:40', '16:40 - 17:30', '17:40 - 18:30', '18:30 - 19:20'
+    ];
+
+    const VIT_SCHEDULE = {
+      MON: {
+        theory: ['A1', 'F1', 'D1', 'TB1', 'TG1', 'S11',  'A2', 'F2', 'D2', 'TB2', 'TG2', 'S3'],
+        lab:    ['L1', 'L2', 'L3', 'L4',  'L5',  'L6',   'L31','L32','L33','L34','L35','L36']
+      },
+      TUE: {
+        theory: ['B1', 'G1', 'E1', 'TC1', 'TAA1','-',    'B2', 'G2', 'E2', 'TC2', 'TAA2','S1'],
+        lab:    ['L7', 'L8', 'L9', 'L10', 'L11', 'L12',  'L37','L38','L39','L40','L41','L42']
+      },
+      WED: {
+        theory: ['C1', 'A1', 'F1', 'TD1', 'TBB1','-',    'C2', 'A2', 'F2', 'TD2', 'TBB2','S4'],
+        lab:    ['L13','L14','L15','L16', 'L17', 'L18',  'L43','L44','L45','L46','L47','L48']
+      },
+      THU: {
+        theory: ['D1', 'B1', 'G1', 'TE1', 'TCC1','-',    'D2', 'B2', 'G2', 'TE2', 'TCC2','S2'],
+        lab:    ['L19','L20','L21','L22', 'L23', 'L24',  'L49','L50','L51','L52','L53','L54']
+      },
+      FRI: {
+        theory: ['E1', 'C1', 'TA1','TF1', 'TDD1','S15',  'E2', 'C2', 'TA2','TF2', 'TDD2','-'],
+        lab:    ['L25','L26','L27','L28', 'L29', 'L30',  'L55','L56','L57','L58','L59','L60']
+      },
+      SAT: {
+        theory: ['X11','X12','Y11','Y12', 'S8',  'S8',   'X21','Z21','Y21','W21','W22','Z22'],
+        lab:    ['L71','L72','L73','L74', 'L75', 'L76',  'L77','L78','L79','L80','L81','L82']
+      },
+      SUN: {
+        theory: ['Y11','Y12','X11','X12', 'S10', 'S10',  'Y21','Z21','X21','W21','W22','Z22'],
+        lab:    ['L83','L84','L85','L86', 'L87', 'L88',  'L89','L90','L91','L92','L93','L94']
+      }
+    };
+
+    // Standard 3-Tier Clusters for Theory
+    const THEORY_THREE_TIERS = {
+      // Morning Slot Clusters
+      'A1':   { single: ['A1'], double: ['A1', 'TA1'], triple: ['A1', 'TA1', 'TAA1'] },
+      'TA1':  { single: ['A1'], double: ['A1', 'TA1'], triple: ['A1', 'TA1', 'TAA1'] },
+      'TAA1': { single: ['A1'], double: ['A1', 'TA1'], triple: ['A1', 'TA1', 'TAA1'] },
+
+      'B1':   { single: ['B1'], double: ['B1', 'TB1'], triple: ['B1', 'TB1', 'TBB1'] },
+      'TB1':  { single: ['B1'], double: ['B1', 'TB1'], triple: ['B1', 'TB1', 'TBB1'] },
+      'TBB1': { single: ['B1'], double: ['B1', 'TB1'], triple: ['B1', 'TB1', 'TBB1'] },
+
+      'C1':   { single: ['C1'], double: ['C1', 'TC1'], triple: ['C1', 'TC1', 'TCC1'] },
+      'TC1':  { single: ['C1'], double: ['C1', 'TC1'], triple: ['C1', 'TC1', 'TCC1'] },
+      'TCC1': { single: ['C1'], double: ['C1', 'TC1'], triple: ['C1', 'TC1', 'TCC1'] },
+
+      'D1':   { single: ['D1'], double: ['D1', 'TD1'], triple: ['D1', 'TD1', 'TDD1'] },
+      'TD1':  { single: ['D1'], double: ['D1', 'TD1'], triple: ['D1', 'TD1', 'TDD1'] },
+      'TDD1': { single: ['D1'], double: ['D1', 'TD1'], triple: ['D1', 'TD1', 'TDD1'] },
+
+      'E1':   { single: ['E1'], double: ['E1', 'TE1'], triple: ['E1', 'TE1'] },
+      'TE1':  { single: ['E1'], double: ['E1', 'TE1'], triple: ['E1', 'TE1'] },
+
+      'F1':   { single: ['F1'], double: ['F1', 'TF1'], triple: ['F1', 'TF1'] },
+      'TF1':  { single: ['F1'], double: ['F1', 'TF1'], triple: ['F1', 'TF1'] },
+
+      'G1':   { single: ['G1'], double: ['G1', 'TG1'], triple: ['G1', 'TG1'] },
+      'TG1':  { single: ['G1'], double: ['G1', 'TG1'], triple: ['G1', 'TG1'] },
+
+      // Afternoon Slot Clusters
+      'A2':   { single: ['A2'], double: ['A2', 'TA2'], triple: ['A2', 'TA2', 'TAA2'] },
+      'TA2':  { single: ['A2'], double: ['A2', 'TA2'], triple: ['A2', 'TA2', 'TAA2'] },
+      'TAA2': { single: ['A2'], double: ['A2', 'TA2'], triple: ['A2', 'TA2', 'TAA2'] },
+
+      'B2':   { single: ['B2'], double: ['B2', 'TB2'], triple: ['B2', 'TB2', 'TBB2'] },
+      'TB2':  { single: ['B2'], double: ['B2', 'TB2'], triple: ['B2', 'TB2', 'TBB2'] },
+      'TBB2': { single: ['B2'], double: ['B2', 'TB2'], triple: ['B2', 'TB2', 'TBB2'] },
+
+      'C2':   { single: ['C2'], double: ['C2', 'TC2'], triple: ['C2', 'TC2', 'TCC2'] },
+      'TC2':  { single: ['C2'], double: ['C2', 'TC2'], triple: ['C2', 'TC2', 'TCC2'] },
+      'TCC2': { single: ['C2'], double: ['C2', 'TC2'], triple: ['C2', 'TC2', 'TCC2'] },
+
+      'D2':   { single: ['D2'], double: ['D2', 'TD2'], triple: ['D2', 'TD2', 'TDD2'] },
+      'TD2':  { single: ['D2'], double: ['D2', 'TD2'], triple: ['D2', 'TD2', 'TDD2'] },
+      'TDD2': { single: ['D2'], double: ['D2', 'TD2'], triple: ['D2', 'TD2', 'TDD2'] },
+
+      'E2':   { single: ['E2'], double: ['E2', 'TE2'], triple: ['E2', 'TE2'] },
+      'TE2':  { single: ['E2'], double: ['E2', 'TE2'], triple: ['E2', 'TE2'] },
+
+      'F2':   { single: ['F2'], double: ['F2', 'TF2'], triple: ['F2', 'TF2'] },
+      'TF2':  { single: ['F2'], double: ['F2', 'TF2'], triple: ['F2', 'TF2'] },
+
+      'G2':   { single: ['G2'], double: ['G2', 'TG2'], triple: ['G2', 'TG2'] },
+      'TG2':  { single: ['G2'], double: ['G2', 'TG2'], triple: ['G2', 'TG2'] }
+    };
+
+    // Preset Swatches
+    const COLOR_PRESETS = [
+      '#c8f338', // VIT signature lime
+      '#7dd3fc', // sky blue
+      '#fca5a5', // light coral
+      '#fde047', // sunny yellow
+      '#86efac', // pastel emerald
+      '#d8b4fe', // pastel violet
+      '#fdba74', // peach
+      '#f9a8d4'  // pink
+    ];
+
+    /* =========================================================================
+       2. APPLICATION STATE & UNDO HISTORY STACK
+       ========================================================================= */
+    const STORAGE_KEY = 'VITC_FFCS_PLANNER_V5';
+    const THEME_KEY = 'VITC_FFCS_THEME';
+
+    let appState = {
+      activeDraftId: 'draft-1',
+      drafts: [
+        {
+          id: 'draft-1',
+          name: 'Draft 1',
+          courses: []
+        }
+      ]
+    };
+
+    // Undo History Stacks per draft
+    const undoHistory = {};
+
+    function getActiveDraft() {
+      let draft = appState.drafts.find(d => d.id === appState.activeDraftId);
+      if (!draft) {
+        draft = appState.drafts[0];
+        appState.activeDraftId = draft.id;
+      }
+      return draft;
+    }
+
+    function pushUndoState() {
+      const draft = getActiveDraft();
+      if (!undoHistory[draft.id]) {
+        undoHistory[draft.id] = [];
+      }
+      // Store a deep clone of the draft's courses
+      undoHistory[draft.id].push(JSON.parse(JSON.stringify(draft.courses)));
+      // Limit history stack size to 25
+      if (undoHistory[draft.id].length > 25) {
+        undoHistory[draft.id].shift();
+      }
+      updateUndoButtonState();
+    }
+
+    function handleUndo() {
+      const draft = getActiveDraft();
+      if (!undoHistory[draft.id] || undoHistory[draft.id].length === 0) return;
+
+      const previousCourses = undoHistory[draft.id].pop();
+      draft.courses = previousCourses;
+      persistState();
+      renderApp();
+      updateUndoButtonState();
+      showToast('Undid last change', 'fa-solid fa-rotate-left');
+    }
+
+    function updateUndoButtonState() {
+      const draft = getActiveDraft();
+      const hasHistory = undoHistory[draft.id] && undoHistory[draft.id].length > 0;
+      const undoBtn = document.getElementById('btn-undo');
+      if (undoBtn) {
+        undoBtn.disabled = !hasHistory;
+      }
+    }
+
+    // Keyboard shortcut for Undo (Ctrl+Z or Cmd+Z)
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        const activeModal = document.querySelector('.fixed:not(.hidden)');
+        // Only trigger if no interactive input/modal is actively open
+        if (!activeModal || activeModal.id === 'toast-bar') {
+          e.preventDefault();
+          handleUndo();
+        }
+      }
+    });
+
+    function loadSavedState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.drafts) && parsed.drafts.length > 0) {
+            appState = parsed;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not read saved state', e);
+      }
+      initTheme();
+    }
+
+    function persistState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      } catch (e) {
+        console.warn('Could not write state', e);
+      }
+    }
+
+    /* =========================================================================
+       3. DARK / LIGHT THEME ENGINE
+       ========================================================================= */
+    function initTheme() {
+      const saved = localStorage.getItem(THEME_KEY);
+      const isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      applyTheme(isDark ? 'dark' : 'light');
+    }
+
+    function applyTheme(theme) {
+      const html = document.documentElement;
+      const icon = document.getElementById('theme-icon');
+      if (theme === 'dark') {
+        html.classList.add('dark');
+        icon.className = 'fa-solid fa-sun';
+        localStorage.setItem(THEME_KEY, 'dark');
+      } else {
+        html.classList.remove('dark');
+        icon.className = 'fa-solid fa-moon';
+        localStorage.setItem(THEME_KEY, 'light');
+      }
+    }
+
+    function toggleTheme() {
+      const isDark = document.documentElement.classList.contains('dark');
+      applyTheme(isDark ? 'light' : 'dark');
+      showToast(isDark ? 'Light Mode Enabled' : 'Dark Mode Enabled');
+    }
+
+    function getContrastTextColor(hexColor) {
+      if (!hexColor || hexColor.charAt(0) !== '#') return '#000000';
+      const c = hexColor.replace('#', '');
+      const r = parseInt(c.substr(0, 2), 16) || 0;
+      const g = parseInt(c.substr(2, 2), 16) || 0;
+      const b = parseInt(c.substr(4, 2), 16) || 0;
+      const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+      return yiq >= 140 ? '#0f172a' : '#ffffff';
+    }
+
+    /* =========================================================================
+       4. PHYSICAL TIME OCCUPANCY MAP & CLASH DETECTION ENGINE
+       ========================================================================= */
+    // Helper to identify physical time occupied by a set of slot tokens across all days
+    function getPhysicalSlotsForTokens(tokens) {
+      const occurrences = [];
+      const allDays = [...WEEKDAYS, ...WEEKENDS];
+
+      tokens.forEach(tok => {
+        const cleanTok = tok.trim().toUpperCase();
+        allDays.forEach(day => {
+          for (let period = 0; period < 12; period++) {
+            const tSlot = VIT_SCHEDULE[day].theory[period].toUpperCase();
+            const lSlot = VIT_SCHEDULE[day].lab[period].toUpperCase();
+
+            if (tSlot === cleanTok) {
+              occurrences.push({
+                day,
+                period,
+                slot: cleanTok,
+                type: 'Theory',
+                time: THEORY_TIMINGS[period]
+              });
+            } else if (lSlot === cleanTok) {
+              occurrences.push({
+                day,
+                period,
+                slot: cleanTok,
+                type: 'Lab',
+                time: LAB_TIMINGS[period]
+              });
+            }
+          }
+        });
+      });
+      return occurrences;
+    }
+
+    // Build complete physical period map for a draft
+    function buildPhysicalOccupancy(draft, excludeCourseId = null) {
+      // Key: "DAY-PERIOD", Value: { course, slot, type, time }
+      const map = {};
+
+      draft.courses.forEach(c => {
+        if (c.id === excludeCourseId) return;
+        const physicalPeriods = getPhysicalSlotsForTokens(c.slots);
+        physicalPeriods.forEach(p => {
+          map[`${p.day}-${p.period}`] = {
+            course: c,
+            slot: p.slot,
+            type: p.type,
+            time: p.time,
+            day: p.day,
+            period: p.period
+          };
+        });
+      });
+
+      return map;
+    }
+
+    // Strict clash verification: Checks if candidate slots physically overlap with ANY existing registered course
+    function checkForClashes(candidateTokens, draft, currentEditId = null) {
+      const physicalMap = buildPhysicalOccupancy(draft, currentEditId);
+      const candidatePhysical = getPhysicalSlotsForTokens(candidateTokens);
+      const clashes = [];
+
+      candidatePhysical.forEach(cp => {
+        const key = `${cp.day}-${cp.period}`;
+        if (physicalMap[key]) {
+          const occ = physicalMap[key];
+          clashes.push({
+            candidateSlot: cp.slot,
+            candidateType: cp.type,
+            day: cp.day,
+            period: cp.period + 1,
+            time: cp.time,
+            conflictingCourse: occ.course,
+            conflictingSlot: occ.slot
+          });
+        }
+      });
+
+      return clashes;
+    }
+
+    function showClashAlert(clashes) {
+      const modal = document.getElementById('clash-modal');
+      const content = document.getElementById('clash-modal-content');
+      
+      let html = `<ul class="list-disc pl-4 space-y-2">`;
+      clashes.forEach(c => {
+        html += `
+          <li>
+            Slot <strong>${c.candidateSlot}</strong> clashes with existing course 
+            <span class="text-rose-700 dark:text-rose-300 font-bold">"${c.conflictingCourse.name}"</span> 
+            (Slot ${c.conflictingSlot}) on <strong>${c.day} Period ${c.period}</strong> (${c.time}).
+          </li>
+        `;
+      });
+      html += `</ul><p class="pt-1 text-slate-600 dark:text-slate-400 font-medium">Please choose a non-clashing slot option or remove the conflicting course first.</p>`;
+      
+      content.innerHTML = html;
+      modal.classList.remove('hidden');
+    }
+
+    function closeClashModal() {
+      document.getElementById('clash-modal').classList.add('hidden');
+    }
+
+    /* =========================================================================
+       5. RENDER APPLICATION
+       ========================================================================= */
+    function renderApp() {
+      const draft = getActiveDraft();
+
+      // Update Draft Title Bar
+      document.getElementById('display-draft-name').textContent = draft.name;
+
+      // Update Credits & Course Counters
+      const totalCredits = draft.courses.reduce((sum, c) => sum + (parseInt(c.credits) || 0), 0);
+      document.getElementById('metric-credits').textContent = totalCredits;
+      document.getElementById('metric-courses').textContent = draft.courses.length;
+
+      renderDraftTabs();
+      renderTimetableGrid();
+      renderSummaryTable();
+      updateUndoButtonState();
+    }
+
+    function renderDraftTabs() {
+      const container = document.getElementById('drafts-tab-container');
+      container.innerHTML = '';
+
+      appState.drafts.forEach(d => {
+        const isActive = d.id === appState.activeDraftId;
+        const totalCred = d.courses.reduce((sum, c) => sum + (parseInt(c.credits) || 0), 0);
+
+        const btn = document.createElement('button');
+        btn.className = `px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+          isActive 
+            ? 'bg-blue-600 text-white shadow-sm' 
+            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700'
+        }`;
+        
+        btn.innerHTML = `
+          <span>${d.name}</span>
+          <span class="text-[10px] px-1.5 py-0.2 rounded-full ${isActive ? 'bg-blue-800 text-blue-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}">
+            ${totalCred}c
+          </span>
+        `;
+        btn.onclick = () => switchDraft(d.id);
+        container.appendChild(btn);
+      });
+
+      // Disable delete button if only 1 draft remains
+      const delBtn = document.getElementById('btn-delete-draft');
+      if (appState.drafts.length <= 1) {
+        delBtn.classList.add('opacity-40', 'pointer-events-none');
+      } else {
+        delBtn.classList.remove('opacity-40', 'pointer-events-none');
+      }
+    }
+
+    function renderTimetableGrid() {
+      const tbody = document.getElementById('timetable-body');
+      tbody.innerHTML = '';
+      const draft = getActiveDraft();
+      const activeDays = showWeekends ? [...WEEKDAYS, ...WEEKENDS] : WEEKDAYS;
+      const physicalMap = buildPhysicalOccupancy(draft);
+
+      activeDays.forEach((day, dayIndex) => {
+        const tr = document.createElement('tr');
+        tr.className = "border-b border-slate-300 dark:border-slate-700";
+
+        // Day Column Cell
+        const dayCell = document.createElement('td');
+        dayCell.className = "border border-slate-300 dark:border-slate-700 font-extrabold text-xs uppercase bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 p-1";
+        dayCell.textContent = day;
+        tr.appendChild(dayCell);
+
+        // Periods 0 to 5 (Morning)
+        for (let p = 0; p < 6; p++) {
+          tr.appendChild(renderSlotCell(day, p, physicalMap));
+        }
+
+        // Single Continuous Vertical LUNCH Column spanning across active days
+        if (dayIndex === 0) {
+          const lunchCell = document.createElement('td');
+          lunchCell.rowSpan = activeDays.length;
+          lunchCell.className = "border border-slate-300 dark:border-slate-700 bg-amber-100 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 font-black text-xs vertical-lunch text-center select-none shadow-inner";
+          lunchCell.textContent = "LUNCH";
+          tr.appendChild(lunchCell);
+        }
+
+        // Periods 6 to 11 (Afternoon)
+        for (let p = 6; p < 12; p++) {
+          tr.appendChild(renderSlotCell(day, p, physicalMap));
+        }
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderSlotCell(day, periodIndex, physicalMap) {
+      const td = document.createElement('td');
+      td.className = "border border-slate-300 dark:border-slate-700 p-0 relative slot-cell";
+
+      const tSlot = VIT_SCHEDULE[day].theory[periodIndex];
+      const lSlot = VIT_SCHEDULE[day].lab[periodIndex];
+
+      const key = `${day}-${periodIndex}`;
+      const occ = physicalMap[key];
+
+      if (occ) {
+        td.classList.add('occupied');
+        const course = occ.course;
+        const bgColor = course.color || '#c8f338';
+        const textColor = getContrastTextColor(bgColor);
+
+        td.style.backgroundColor = bgColor;
+        td.style.color = textColor;
+
+        td.innerHTML = `
+          <div class="h-full w-full p-1.5 flex flex-col justify-between text-left select-none overflow-hidden">
+            <div class="flex items-center justify-between gap-1 leading-none">
+              <span class="text-[10px] font-mono font-black opacity-90 px-1 py-0.2 rounded" style="background: rgba(0,0,0,0.18); color: ${textColor}">${occ.slot}</span>
+              ${course.venue ? `<span class="text-[9px] font-semibold opacity-85 truncate">${course.venue}</span>` : (course.code ? `<span class="text-[9px] font-mono opacity-85 truncate">${course.code}</span>` : '')}
+            </div>
+            <div class="subject-title-lg my-auto text-center" style="color: ${textColor}" title="${course.name}">
+              ${course.name}
+            </div>
+            <div class="flex items-center justify-between text-[9px] font-semibold opacity-85 leading-none truncate" style="color: ${textColor}">
+              <span class="truncate">${course.faculty || course.slots.join('+')}</span>
+              <span class="uppercase tracking-wider font-extrabold text-[8.5px] ml-1">${course.type}</span>
+            </div>
+          </div>
+        `;
+        td.onclick = () => openCourseModal(day, periodIndex, tSlot, lSlot, course);
+      } else {
+        // Free Slot Cell: Theory Slot Top-Left, Lab Slot (L#) Bottom-Right
+        td.innerHTML = `
+          <div class="h-full w-full p-1.5 flex flex-col justify-between text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition">
+            <span class="text-[11px] font-bold font-mono text-left leading-none">${tSlot !== '-' ? tSlot : ''}</span>
+            <span class="text-[10px] font-bold font-mono text-right leading-none">${lSlot !== '-' ? lSlot : ''}</span>
+          </div>
+        `;
+        td.onclick = () => openCourseModal(day, periodIndex, tSlot, lSlot, null);
+      }
+
+      return td;
+    }
+
+    function renderSummaryTable() {
+      const tbody = document.getElementById('registered-courses-body');
+      tbody.innerHTML = '';
+      const draft = getActiveDraft();
+
+      if (draft.courses.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="9" class="text-center py-6 text-slate-400 dark:text-slate-500 italic">
+              No courses registered in this draft yet. Click any slot in the timetable above to register a course.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      draft.courses.forEach(c => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer";
+        tr.innerHTML = `
+          <td class="p-2.5 border-r dark:border-slate-700 text-center">
+            <span class="w-5 h-5 rounded-md inline-block border border-black/20 shadow-sm" style="background-color: ${c.color};"></span>
+          </td>
+          <td class="p-2.5 border-r dark:border-slate-700 font-extrabold text-slate-900 dark:text-white">
+            ${c.name}
+          </td>
+          <td class="p-2.5 border-r dark:border-slate-700 font-mono text-slate-600 dark:text-slate-300">
+            ${c.code || '—'}
+          </td>
+          <td class="p-2.5 border-r dark:border-slate-700 font-mono font-bold text-blue-600 dark:text-blue-400">
+            ${c.slots.join(' + ')}
+          </td>
+          <td class="p-2.5 border-r dark:border-slate-700">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${c.type === 'Theory' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'}">
+              ${c.type}
+            </span>
+          </td>
+          <td class="p-2.5 border-r dark:border-slate-700">${c.faculty || '—'}</td>
+          <td class="p-2.5 border-r dark:border-slate-700 font-mono">${c.venue || '—'}</td>
+          <td class="p-2.5 border-r dark:border-slate-700 text-center font-bold font-mono">${c.credits}</td>
+          <td class="p-2.5 text-center">
+            <button class="px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-950/50 rounded transition" title="Remove course">
+              <i class="fa-solid fa-trash-can mr-1"></i> Remove
+            </button>
+          </td>
+        `;
+
+        // Direct Row Remove button
+        const removeBtn = tr.querySelector('button');
+        removeBtn.onclick = (e) => {
+          e.stopPropagation();
+          openConfirmModal(
+            "Remove Course",
+            `Are you sure you want to remove "${c.name}" (${c.slots.join(' + ')})? All corresponding slots will be freed.`,
+            () => {
+              pushUndoState();
+              deleteCourseById(c.id);
+            }
+          );
+        };
+
+        // Click row to open edit modal
+        tr.onclick = () => {
+          openCourseModalDirect(c);
+        };
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    /* =========================================================================
+       6. COURSE MODAL: 3 THEORY CLUSTER TIERS & STRICT 2-PERIOD LAB SESSIONS
+       ========================================================================= */
+    let currentEditCourseId = null;
+
+    function buildModalSlotOptions(tSlot, lSlot) {
+      const select = document.getElementById('slot-select-input');
+      select.innerHTML = '';
+
+      // 1. THEORY OPTIONS: 3 Standard Tiers (Single, Double, Triple)
+      if (tSlot && tSlot !== '-') {
+        const cluster = THEORY_THREE_TIERS[tSlot];
+        if (cluster) {
+          // Option 1: Single Tier (1 Credit / Standalone)
+          const optSingle = document.createElement('option');
+          optSingle.value = JSON.stringify({ slots: cluster.single, type: 'Theory', credits: 1 });
+          optSingle.textContent = `Theory [Single]: ${cluster.single.join(' + ')}`;
+          select.appendChild(optSingle);
+
+          // Option 2: Double Tier (2-3 Credits: Core + Tutorial)
+          if (cluster.double && cluster.double.length > 1) {
+            const optDouble = document.createElement('option');
+            optDouble.value = JSON.stringify({ slots: cluster.double, type: 'Theory', credits: 3 });
+            optDouble.textContent = `Theory [Double]: ${cluster.double.join(' + ')}`;
+            select.appendChild(optDouble);
+          }
+
+          // Option 3: Triple Tier (3-4 Credits: Core + Tutorial + Additional)
+          if (cluster.triple && cluster.triple.length > 2) {
+            const optTriple = document.createElement('option');
+            optTriple.value = JSON.stringify({ slots: cluster.triple, type: 'Theory', credits: 4 });
+            optTriple.textContent = `Theory [Triple]: ${cluster.triple.join(' + ')}`;
+            select.appendChild(optTriple);
+          }
+        } else {
+          // Non-standard theory slot (e.g. S11, S15, X11)
+          const optCustomTh = document.createElement('option');
+          optCustomTh.value = JSON.stringify({ slots: [tSlot], type: 'Theory', credits: 3 });
+          optCustomTh.textContent = `Theory Slot: ${tSlot}`;
+          select.appendChild(optCustomTh);
+        }
+      }
+
+      // 2. LAB OPTIONS: STRICTLY a 2-continuous slot session (No Single Lab!)
+      if (lSlot && lSlot !== '-') {
+        const num = parseInt(lSlot.replace(/\D/g, ''));
+        if (!isNaN(num)) {
+          let pair = [];
+          if (num % 2 !== 0) {
+            pair = [`L${num}`, `L${num + 1}`];
+          } else {
+            pair = [`L${num - 1}`, `L${num}`];
+          }
+          const optLabPair = document.createElement('option');
+          optLabPair.value = JSON.stringify({ slots: pair, type: 'Lab', credits: 2 });
+          optLabPair.textContent = `Lab [Continuous 2-Period]: ${pair.join(' + ')}`;
+          select.appendChild(optLabPair);
+        }
+      }
+
+      // Default select the Double Theory option if available, otherwise first option
+      if (select.options.length > 1 && select.options[1].textContent.includes('Theory [Double]')) {
+        select.selectedIndex = 1;
+      }
+    }
+
+    function onSlotSelectChange(val) {
+      try {
+        const data = JSON.parse(val);
+        if (data.credits && !currentEditCourseId) {
+          document.getElementById('credits-input').value = data.credits;
+        }
+      } catch (e) {}
+    }
+
+    function renderSwatches(activeColor) {
+      const container = document.getElementById('swatch-list');
+      container.innerHTML = '';
+
+      COLOR_PRESETS.forEach(color => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `w-6 h-6 rounded-md border-2 transition ${color.toLowerCase() === activeColor.toLowerCase() ? 'border-blue-600 scale-110 shadow-sm' : 'border-black/20 hover:scale-105'}`;
+        btn.style.backgroundColor = color;
+        btn.onclick = () => {
+          document.getElementById('spectrum-color-input').value = color;
+          document.getElementById('hex-label').textContent = color.toUpperCase();
+          renderSwatches(color);
+        };
+        container.appendChild(btn);
+      });
+      document.getElementById('spectrum-color-input').value = activeColor;
+      document.getElementById('hex-label').textContent = activeColor.toUpperCase();
+    }
+
+    function onCustomColorPick(hex) {
+      document.getElementById('hex-label').textContent = hex.toUpperCase();
+      renderSwatches(hex);
+    }
+
+    function openCourseModal(day, periodIndex, tSlot, lSlot, existingCourse) {
+      currentEditCourseId = existingCourse ? existingCourse.id : null;
+      const modal = document.getElementById('course-modal');
+      const deleteBtn = document.getElementById('btn-delete-course');
+
+      document.getElementById('modal-pos-info').textContent = `${day} - Period ${periodIndex + 1}`;
+      document.getElementById('modal-slots-info').textContent = `${tSlot} / ${lSlot}`;
+
+      buildModalSlotOptions(tSlot, lSlot);
+
+      if (existingCourse) {
+        document.getElementById('modal-title').textContent = 'Edit Course';
+        document.getElementById('course-name-input').value = existingCourse.name;
+        document.getElementById('course-code-input').value = existingCourse.code || '';
+        document.getElementById('faculty-name-input').value = existingCourse.faculty || '';
+        document.getElementById('venue-name-input').value = existingCourse.venue || '';
+        document.getElementById('credits-input').value = existingCourse.credits || 3;
+        renderSwatches(existingCourse.color || '#c8f338');
+        deleteBtn.classList.remove('hidden');
+
+        // Check if existing course's slots match any option
+        const select = document.getElementById('slot-select-input');
+        let matched = false;
+        for (let opt of select.options) {
+          const parsed = JSON.parse(opt.value);
+          if (JSON.stringify(parsed.slots) === JSON.stringify(existingCourse.slots)) {
+            opt.selected = true;
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) {
+          const customOpt = document.createElement('option');
+          customOpt.value = JSON.stringify({ slots: existingCourse.slots, type: existingCourse.type });
+          customOpt.textContent = `${existingCourse.type}: ${existingCourse.slots.join(' + ')}`;
+          customOpt.selected = true;
+          select.prepend(customOpt);
+        }
+      } else {
+        document.getElementById('modal-title').textContent = 'Register Course';
+        document.getElementById('course-name-input').value = '';
+        document.getElementById('course-code-input').value = '';
+        document.getElementById('faculty-name-input').value = '';
+        document.getElementById('venue-name-input').value = '';
+        document.getElementById('credits-input').value = 3;
+        renderSwatches('#c8f338');
+        deleteBtn.classList.add('hidden');
+      }
+
+      modal.classList.remove('hidden');
+      document.getElementById('course-name-input').focus();
+    }
+
+    function openCourseModalDirect(course) {
+      currentEditCourseId = course.id;
+      const modal = document.getElementById('course-modal');
+      const deleteBtn = document.getElementById('btn-delete-course');
+      const select = document.getElementById('slot-select-input');
+
+      document.getElementById('modal-title').textContent = 'Edit Course';
+      document.getElementById('modal-pos-info').textContent = 'Course Summary View';
+      document.getElementById('modal-slots-info').textContent = course.slots.join(' + ');
+
+      select.innerHTML = '';
+      const opt = document.createElement('option');
+      opt.value = JSON.stringify({ slots: course.slots, type: course.type });
+      opt.textContent = `${course.type}: ${course.slots.join(' + ')}`;
+      opt.selected = true;
+      select.appendChild(opt);
+
+      document.getElementById('course-name-input').value = course.name;
+      document.getElementById('course-code-input').value = course.code || '';
+      document.getElementById('faculty-name-input').value = course.faculty || '';
+      document.getElementById('venue-name-input').value = course.venue || '';
+      document.getElementById('credits-input').value = course.credits || 3;
+      renderSwatches(course.color || '#c8f338');
+      deleteBtn.classList.remove('hidden');
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeCourseModal() {
+      document.getElementById('course-modal').classList.add('hidden');
+      currentEditCourseId = null;
+    }
+
+    // Form Submit Handler with Strict Conflict Clash Prevention
+    document.getElementById('course-form').onsubmit = (e) => {
+      e.preventDefault();
+      const draft = getActiveDraft();
+
+      const name = document.getElementById('course-name-input').value.trim();
+      const code = document.getElementById('course-code-input').value.trim().toUpperCase();
+      const faculty = document.getElementById('faculty-name-input').value.trim();
+      const venue = document.getElementById('venue-name-input').value.trim();
+      const credits = parseInt(document.getElementById('credits-input').value) || 3;
+      const color = document.getElementById('spectrum-color-input').value;
+      const slotData = JSON.parse(document.getElementById('slot-select-input').value);
+
+      if (!name) return;
+
+      // STRICT COLLISION CHECK: Detect any physical time clashes
+      const clashes = checkForClashes(slotData.slots, draft, currentEditCourseId);
+
+      if (clashes.length > 0) {
+        // Block registration and present strict clash alert
+        showClashAlert(clashes);
+        return;
+      }
+
+      // No Clash: Record state in undo history and save course
+      pushUndoState();
+
+      if (currentEditCourseId) {
+        const idx = draft.courses.findIndex(c => c.id === currentEditCourseId);
+        if (idx !== -1) {
+          draft.courses[idx] = {
+            id: currentEditCourseId,
+            name,
+            code,
+            faculty,
+            venue,
+            credits,
+            color,
+            slots: slotData.slots,
+            type: slotData.type
+          };
+        }
+        showToast(`Updated "${name}"`);
+      } else {
+        draft.courses.push({
+          id: 'c-' + Date.now(),
+          name,
+          code,
+          faculty,
+          venue,
+          credits,
+          color,
+          slots: slotData.slots,
+          type: slotData.type
+        });
+        showToast(`Registered "${name}" (${slotData.slots.join('+')})`);
+      }
+
+      persistState();
+      closeCourseModal();
+      renderApp();
+    };
+
+    function triggerDeleteCourseFromModal() {
+      if (!currentEditCourseId) return;
+      openConfirmModal(
+        "Remove Course",
+        "Remove this course and clear all its corresponding slots across the timetable?",
+        () => {
+          pushUndoState();
+          deleteCourseById(currentEditCourseId);
+          closeCourseModal();
+        }
+      );
+    }
+
+    function deleteCourseById(courseId) {
+      const draft = getActiveDraft();
+      draft.courses = draft.courses.filter(c => c.id !== courseId);
+      persistState();
+      renderApp();
+      showToast('Course removed');
+    }
+
+    /* =========================================================================
+       7. DRAFT MANAGEMENT WITH RELIABLE MODALS
+       ========================================================================= */
+    let currentDraftModalMode = 'new'; // 'new' | 'duplicate' | 'rename'
+
+    function openDraftModal(mode) {
+      currentDraftModalMode = mode;
+      const modal = document.getElementById('draft-name-modal');
+      const title = document.getElementById('draft-name-modal-title');
+      const label = document.getElementById('draft-name-label');
+      const input = document.getElementById('draft-name-input');
+      const icon = document.getElementById('draft-name-icon');
+      const current = getActiveDraft();
+
+      if (mode === 'new') {
+        title.textContent = 'Create New Draft';
+        label.textContent = 'Enter title for new draft:';
+        input.value = `Draft ${appState.drafts.length + 1}`;
+        icon.className = 'fa-solid fa-folder-plus text-blue-500';
+      } else if (mode === 'duplicate') {
+        title.textContent = 'Duplicate Draft';
+        label.textContent = `Duplicate "${current.name}" as:`;
+        input.value = `${current.name} (Copy)`;
+        icon.className = 'fa-regular fa-clone text-blue-500';
+      } else if (mode === 'rename') {
+        title.textContent = 'Rename Draft';
+        label.textContent = 'Enter new draft title:';
+        input.value = current.name;
+        icon.className = 'fa-solid fa-pen text-blue-500';
+      }
+
+      modal.classList.remove('hidden');
+      input.focus();
+      input.select();
+    }
+
+    function closeDraftModal() {
+      document.getElementById('draft-name-modal').classList.add('hidden');
+    }
+
+    function submitDraftNameModal() {
+      const input = document.getElementById('draft-name-input');
+      const name = (input.value || '').trim();
+      if (!name) return;
+
+      if (currentDraftModalMode === 'new') {
+        const newDraft = {
+          id: 'draft-' + Date.now(),
+          name: name,
+          courses: []
+        };
+        appState.drafts.push(newDraft);
+        appState.activeDraftId = newDraft.id;
+        showToast(`Created draft: ${name}`);
+      } else if (currentDraftModalMode === 'duplicate') {
+        const current = getActiveDraft();
+        const dupDraft = {
+          id: 'draft-' + Date.now(),
+          name: name,
+          courses: JSON.parse(JSON.stringify(current.courses))
+        };
+        appState.drafts.push(dupDraft);
+        appState.activeDraftId = dupDraft.id;
+        showToast(`Duplicated as: ${name}`);
+      } else if (currentDraftModalMode === 'rename') {
+        const current = getActiveDraft();
+        current.name = name;
+        showToast(`Renamed draft to: ${name}`);
+      }
+
+      persistState();
+      closeDraftModal();
+      renderApp();
+    }
+
+    document.getElementById('draft-name-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submitDraftNameModal();
+      if (e.key === 'Escape') closeDraftModal();
+    });
+
+    function switchDraft(id) {
+      if (appState.activeDraftId === id) return;
+      appState.activeDraftId = id;
+      persistState();
+      renderApp();
+      const draft = getActiveDraft();
+      showToast(`Switched to ${draft.name}`);
+    }
+
+    function triggerClearDraft() {
+      const current = getActiveDraft();
+      if (current.courses.length === 0) {
+        showToast('Draft is already empty');
+        return;
+      }
+      openConfirmModal(
+        "Clear All Courses",
+        `Clear all ${current.courses.length} courses in "${current.name}"? This action can be undone.`,
+        () => {
+          pushUndoState();
+          current.courses = [];
+          persistState();
+          renderApp();
+          showToast(`Cleared "${current.name}"`);
+        }
+      );
+    }
+
+    function triggerDeleteDraft() {
+      if (appState.drafts.length <= 1) {
+        showToast('Cannot delete the only remaining draft', 'fa-solid fa-triangle-exclamation');
+        return;
+      }
+      const current = getActiveDraft();
+      openConfirmModal(
+        "Delete Draft",
+        `Permanently delete "${current.name}"?`,
+        () => {
+          appState.drafts = appState.drafts.filter(d => d.id !== current.id);
+          appState.activeDraftId = appState.drafts[0].id;
+          persistState();
+          renderApp();
+          showToast(`Deleted "${current.name}"`);
+        }
+      );
+    }
+
+    /* =========================================================================
+       8. IN-APP CONFIRMATION MODAL LOGIC
+       ========================================================================= */
+    let confirmActionCallback = null;
+    function openConfirmModal(title, msg, onConfirm) {
+      const modal = document.getElementById('confirm-modal');
+      document.getElementById('confirm-title').textContent = title;
+      document.getElementById('confirm-message').textContent = msg;
+      confirmActionCallback = onConfirm;
+      modal.classList.remove('hidden');
+    }
+
+    document.getElementById('btn-confirm-cancel').onclick = () => {
+      document.getElementById('confirm-modal').classList.add('hidden');
+      confirmActionCallback = null;
+    };
+
+    document.getElementById('btn-confirm-action').onclick = () => {
+      if (confirmActionCallback) confirmActionCallback();
+      document.getElementById('confirm-modal').classList.add('hidden');
+      confirmActionCallback = null;
+    };
+
+    /* =========================================================================
+       9. IMAGE CAPTURE VIA HTML2CANVAS
+       ========================================================================= */
+    function triggerCapture() {
+      const captureArea = document.getElementById('timetable-capture-area');
+      const draft = getActiveDraft();
+      const isDark = document.documentElement.classList.contains('dark');
+      const btn = document.getElementById('btn-capture');
+      const originalHtml = btn.innerHTML;
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Capturing...</span>';
+      showToast('Generating timetable image...');
+
+      const originalOverflow = captureArea.style.overflow;
+      captureArea.style.overflow = 'visible';
+
+      setTimeout(() => {
+        html2canvas(captureArea, {
+          scale: 2,
+          backgroundColor: isDark ? '#090d16' : '#ffffff',
+          useCORS: true,
+          logging: false,
+          windowWidth: 1400
+        }).then(canvas => {
+          captureArea.style.overflow = originalOverflow;
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+
+          const link = document.createElement('a');
+          link.download = `${draft.name.replace(/[^a-zA-Z0-9_-]/g, '_')}_FFCS_Timetable.png`;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+          showToast('Image downloaded successfully!');
+        }).catch(err => {
+          captureArea.style.overflow = originalOverflow;
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+          console.error(err);
+          showToast('Failed to capture image', 'fa-solid fa-triangle-exclamation');
+        });
+      }, 100);
+    }
+
+    function toggleWeekends() {
+      showWeekends = !showWeekends;
+      document.getElementById('weekend-toggle-label').textContent = showWeekends ? 'Hide Sat & Sun' : 'Show Sat & Sun';
+      renderApp();
+      showToast(showWeekends ? 'Showing Weekend Slots' : 'Showing Monday to Friday');
+    }
+
+    /* =========================================================================
+       10. TOAST NOTIFICATIONS
+       ========================================================================= */
+    let toastTimer;
+    function showToast(text, iconClass = 'fa-solid fa-circle-check text-emerald-400') {
+      const bar = document.getElementById('toast-bar');
+      const icon = document.getElementById('toast-icon');
+      const txt = document.getElementById('toast-text');
+
+      txt.textContent = text;
+      icon.className = iconClass;
+
+      bar.classList.remove('translate-y-20', 'opacity-0');
+      bar.classList.add('translate-y-0', 'opacity-100');
+
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        bar.classList.remove('translate-y-0', 'opacity-100');
+        bar.classList.add('translate-y-20', 'opacity-0');
+      }, 2600);
+    }
+
+    // Initialize App on DOM load
+    window.addEventListener('DOMContentLoaded', () => {
+      loadSavedState();
+      renderApp();
+    });
+  </script>
+</body>
+</html>
