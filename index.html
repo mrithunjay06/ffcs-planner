@@ -348,9 +348,17 @@
 
         <div>
           <label class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
-            Course Title / Code <span class="text-rose-500">*</span>
+            Course Title <span class="text-rose-500">*</span>
           </label>
-          <input type="text" id="course-name-input" required placeholder="e.g., Operating Systems (BCSE303L)" 
+          <input type="text" id="course-name-input" required placeholder="e.g., Operating Systems" 
+            class="w-full text-xs px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+            Course Code <span class="font-normal normal-case text-slate-400">(Optional)</span>
+          </label>
+          <input type="text" id="course-code-input" placeholder="e.g., BCSE303L"
             class="w-full text-xs px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
 
@@ -1159,6 +1167,7 @@
       if (existingCourse) {
         document.getElementById('modal-title').textContent = 'Edit Course';
         document.getElementById('course-name-input').value = existingCourse.name;
+        document.getElementById('course-code-input').value = existingCourse.code || '';
         document.getElementById('faculty-name-input').value = existingCourse.faculty || '';
         document.getElementById('venue-name-input').value = existingCourse.venue || '';
         document.getElementById('credits-input').value = existingCourse.credits !== undefined ? existingCourse.credits : 3;
@@ -1196,6 +1205,7 @@
       } else {
         document.getElementById('modal-title').textContent = 'Register Course';
         document.getElementById('course-name-input').value = '';
+        document.getElementById('course-code-input').value = '';
         document.getElementById('faculty-name-input').value = '';
         document.getElementById('venue-name-input').value = '';
         document.getElementById('credits-input').value = 3;
@@ -1230,6 +1240,7 @@
       populateParentDropdowns(draft, course);
 
       document.getElementById('course-name-input').value = course.name;
+      document.getElementById('course-code-input').value = course.code || '';
       document.getElementById('faculty-name-input').value = course.faculty || '';
       document.getElementById('venue-name-input').value = course.venue || '';
       document.getElementById('credits-input').value = course.credits !== undefined ? course.credits : 3;
@@ -1396,6 +1407,7 @@
       const draft = getActiveDraft();
 
       const name = document.getElementById('course-name-input').value.trim();
+      const code = document.getElementById('course-code-input').value.trim();
       const faculty = document.getElementById('faculty-name-input').value.trim();
       const venue = document.getElementById('venue-name-input').value.trim();
       const credits = parseInt(document.getElementById('credits-input').value) || 0;
@@ -1439,16 +1451,17 @@
       }
 
       pushUndoSnapshot();
-      saveCourseData(draft, name, faculty, venue, credits, color, slotData, linkedParentId, linkType);
+      saveCourseData(draft, name, code, faculty, venue, credits, color, slotData, linkedParentId, linkType);
     };
 
-    function saveCourseData(draft, name, faculty, venue, credits, color, slotData, linkedParentId, linkType) {
+    function saveCourseData(draft, name, code, faculty, venue, credits, color, slotData, linkedParentId, linkType) {
       if (currentEditCourseId) {
         const idx = draft.courses.findIndex(c => c.id === currentEditCourseId);
         if (idx !== -1) {
           draft.courses[idx] = {
             id: currentEditCourseId,
             name,
+            code,
             faculty,
             venue,
             credits,
@@ -1463,6 +1476,7 @@
         draft.courses.push({
           id: 'course-' + Date.now(),
           name,
+          code,
           faculty,
           venue,
           credits,
