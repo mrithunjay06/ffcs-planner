@@ -32,16 +32,18 @@
     .timetable-fixed {
       table-layout: fixed;
       width: 100%;
-      min-width: 1180px;
+      min-width: 1200px;
     }
     .slot-cell {
-      height: 76px;
-      max-height: 76px;
+      height: 88px;
+      min-height: 88px;
+      max-height: 88px;
       width: 100%;
       overflow: hidden;
       position: relative;
       cursor: pointer;
       user-select: none;
+      box-sizing: border-box;
       transition: background-color 0.15s ease, border-color 0.15s ease;
     }
     .slot-cell:hover:not(.occupied) {
@@ -77,6 +79,10 @@
       <div class="flex items-center flex-wrap gap-2">
         <button id="btn-undo" class="px-2.5 py-1.5 rounded text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1.5 opacity-50 cursor-not-allowed" disabled title="Undo (Ctrl+Z / Cmd+Z)">
           <i class="fa-solid fa-rotate-left"></i> Undo
+        </button>
+
+        <button id="btn-redo" class="px-2.5 py-1.5 rounded text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1.5 opacity-50 cursor-not-allowed" disabled title="Redo (Ctrl+Y / Cmd+Shift+Z)">
+          <i class="fa-solid fa-rotate-right"></i> Redo
         </button>
 
         <button id="btn-toggle-weekend" class="px-2.5 py-1.5 rounded text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1.5" title="Toggle Saturday & Sunday">
@@ -272,8 +278,8 @@
 
   <!-- Slot Click / Course Configuration Modal -->
   <div id="course-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
-      <div class="bg-[#0d2847] text-white px-5 py-3.5 flex items-center justify-between">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl max-w-md w-full max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="bg-[#0d2847] text-white px-5 py-3.5 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-2">
           <i class="fa-solid fa-graduation-cap text-blue-300"></i>
           <h3 class="font-bold text-sm tracking-wide" id="modal-title">Configure Course Slot</h3>
@@ -281,7 +287,7 @@
         <button id="btn-close-course-modal" class="text-slate-300 hover:text-white text-lg leading-none">&times;</button>
       </div>
 
-      <form id="course-form" class="p-5 space-y-4">
+      <form id="course-form" class="p-5 space-y-4 overflow-y-auto flex-1">
         <div class="bg-blue-50 dark:bg-slate-800 p-2.5 rounded-lg border border-blue-200 dark:border-slate-700 flex items-center justify-between text-xs">
           <div>
             <span class="text-slate-500 dark:text-slate-400">Position:</span>
@@ -301,26 +307,41 @@
           <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Multi-slots automatically occupy matching weekly periods.</p>
         </div>
 
-        <!-- Dynamic Lab Linking Section (Displayed only when Lab slot selected) -->
+        <!-- Dynamic Lab Linking Section (Standalone vs Link to Theory vs Link to Another Lab) -->
         <div id="lab-link-section" class="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800/60 space-y-2 hidden">
           <span class="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
             <i class="fa-solid fa-link text-amber-600 dark:text-amber-400"></i> Course Classification:
           </span>
-          <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
             <label class="flex items-center gap-1.5 cursor-pointer">
               <input type="radio" name="lab-link-type" value="standalone" id="radio-lab-standalone" checked class="text-blue-600">
               <span class="text-slate-700 dark:text-slate-300 font-medium">Standalone Lab</span>
             </label>
             <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="radio" name="lab-link-type" value="linked" id="radio-lab-linked" class="text-blue-600">
+              <input type="radio" name="lab-link-type" value="linked-theory" id="radio-lab-linked-theory" class="text-blue-600">
               <span class="text-slate-700 dark:text-slate-300 font-medium">Link to Theory</span>
             </label>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="radio" name="lab-link-type" value="linked-lab" id="radio-lab-linked-lab" class="text-blue-600">
+              <span class="text-slate-700 dark:text-slate-300 font-medium">Link to Lab</span>
+            </label>
           </div>
+
+          <!-- Selector for Theory Parent -->
           <div id="parent-theory-wrap" class="pt-1.5 hidden">
-            <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Select Existing Theory Course:</label>
+            <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Select Parent Theory Course:</label>
             <select id="parent-theory-select" class="w-full text-xs px-2.5 py-1.5 border rounded-lg bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none"></select>
             <p class="text-[10px] text-amber-800 dark:text-amber-300 mt-1 leading-tight">
-              Inherits name & color. Lab credits are marked as included in theory, keeping true total credits.
+              Inherits name & color. Lab credits are counted within the theory course.
+            </p>
+          </div>
+
+          <!-- Selector for Lab Parent -->
+          <div id="parent-lab-wrap" class="pt-1.5 hidden">
+            <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Select Previous Lab Session to Link:</label>
+            <select id="parent-lab-select" class="w-full text-xs px-2.5 py-1.5 border rounded-lg bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none"></select>
+            <p class="text-[10px] text-amber-800 dark:text-amber-300 mt-1 leading-tight">
+              Connects to your previous lab session (2 sessions/week). Both will merge into a single row with combined slots.
             </p>
           </div>
         </div>
@@ -355,18 +376,15 @@
           <div>
             <label class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">Slot Color</label>
             <div class="flex items-center gap-2">
-              <input type="color" id="spectrum-color-input" value="#c8f338" class="w-8 h-8 rounded border border-slate-300 dark:border-slate-700 cursor-pointer p-0">
-              <div class="flex items-center gap-1">
-                <button type="button" class="preset-color w-5 h-5 rounded-full border border-black/20" style="background:#c8f338;" data-color="#c8f338" title="VIT Lime"></button>
-                <button type="button" class="preset-color w-5 h-5 rounded-full border border-black/20" style="background:#93c5fd;" data-color="#93c5fd" title="Sky Blue"></button>
-                <button type="button" class="preset-color w-5 h-5 rounded-full border border-black/20" style="background:#fbcfe8;" data-color="#fbcfe8" title="Pink"></button>
-                <button type="button" class="preset-color w-5 h-5 rounded-full border border-black/20" style="background:#fed7aa;" data-color="#fed7aa" title="Peach"></button>
+              <input type="color" id="spectrum-color-input" value="#c8f338" class="w-8 h-8 rounded border border-slate-300 dark:border-slate-700 cursor-pointer p-0 shrink-0">
+              <div id="preset-colors-container" class="flex flex-wrap items-center gap-1.5">
+                <!-- 10 Preset colors rendered dynamically -->
               </div>
             </div>
           </div>
         </div>
 
-        <div class="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800">
+        <div class="sticky bottom-0 bg-white dark:bg-slate-900 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <button type="button" id="btn-delete-course" class="px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition hidden">
             <i class="fa-solid fa-trash-can mr-1"></i> Remove Course
           </button>
@@ -441,11 +459,11 @@
       ],
       SAT: [
         { th: 'X11', lb: 'L71' }, { th: 'X12', lb: 'L72' }, { th: 'Y11', lb: 'L73' }, { th: 'Y12', lb: 'L74' }, { th: 'S8', lb: 'L75' }, { th: 'S8', lb: 'L76' },
-        { th: 'X21', lb: 'L77' }, { th: 'Z21', lb: 'L78' }, { th: 'Y21', lb: 'L79' }, { th: 'W21', lb: 'L80' }, { th: 'W22', lb: 'L81' }, { th: 'Z22', lb: 'L82' }
+        { th: 'X21', lb: 'L77' }, { th: 'Z21', lb: 'L78' }, { th: 'Y21', lb: 'L79' }, { th: 'W21', lb: 'L80' }, { th: 'W22', lb: 'L81' }, { leisure: true, th: 'Z22', lb: 'L82' }
       ],
       SUN: [
         { th: 'Y11', lb: 'L83' }, { th: 'Y12', lb: 'L84' }, { th: 'X11', lb: 'L85' }, { th: 'X12', lb: 'L86' }, { th: 'S10', lb: 'L87' }, { th: 'S10', lb: 'L88' },
-        { th: 'Y21', lb: 'L89' }, { th: 'Z21', lb: 'L90' }, { th: 'X21', lb: 'L91' }, { th: 'W21', lb: 'L92' }, { th: 'W22', lb: 'L93' }, { th: 'Z22', lb: 'L94' }
+        { th: 'Y21', lb: 'L89' }, { th: 'Z21', lb: 'L90' }, { th: 'X21', lb: 'L91' }, { th: 'W21', lb: 'L92' }, { th: 'W22', lb: 'L93' }, { leisure: true, th: 'Z22', lb: 'L94' }
       ]
     };
 
@@ -501,12 +519,28 @@
       'TG2': { single: ['G2'], double: ['G2', 'TG2'], triple: null }
     };
 
-    const STORAGE_KEY = 'vit_ffcs_state_v8';
+    // 10 Distinct Preset Colors
+    const PRESET_COLORS = [
+      { hex: '#c8f338', name: 'VIT Lime' },
+      { hex: '#86efac', name: 'Mint' },
+      { hex: '#5eead4', name: 'Teal' },
+      { hex: '#93c5fd', name: 'Sky Blue' },
+      { hex: '#818cf8', name: 'Indigo' },
+      { hex: '#c4b5fd', name: 'Lavender' },
+      { hex: '#fbcfe8', name: 'Pink' },
+      { hex: '#fda4af', name: 'Rose' },
+      { hex: '#fed7aa', name: 'Peach' },
+      { hex: '#fde68a', name: 'Warm Sand' }
+    ];
+
+    const STORAGE_KEY = 'vit_ffcs_state_v12';
 
     let appState = {
       theme: 'light',
       showWeekend: false,
       activeDraftId: 'draft-1',
+      undoStack: [],
+      redoStack: [],
       drafts: [
         {
           id: 'draft-1',
@@ -516,18 +550,19 @@
       ]
     };
 
-    const undoStack = [];
-
+    // Undo & Redo History System
     function pushUndoSnapshot() {
       const snapshot = JSON.stringify(appState.drafts);
-      undoStack.push(snapshot);
-      if (undoStack.length > 30) undoStack.shift();
-      updateUndoButton();
+      appState.undoStack.push(snapshot);
+      if (appState.undoStack.length > 30) appState.undoStack.shift();
+      appState.redoStack = [];
+      updateUndoRedoButtons();
     }
 
     function applyUndo() {
-      if (undoStack.length === 0) return;
-      const previousState = undoStack.pop();
+      if (!appState.undoStack || appState.undoStack.length === 0) return;
+      appState.redoStack.push(JSON.stringify(appState.drafts));
+      const previousState = appState.undoStack.pop();
       try {
         appState.drafts = JSON.parse(previousState);
         saveState();
@@ -535,43 +570,88 @@
       } catch (err) {
         console.error("Failed to undo:", err);
       }
-      updateUndoButton();
+      updateUndoRedoButtons();
     }
 
-    function updateUndoButton() {
-      const btn = document.getElementById('btn-undo');
-      if (undoStack.length > 0) {
-        btn.disabled = false;
-        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+    function applyRedo() {
+      if (!appState.redoStack || appState.redoStack.length === 0) return;
+      appState.undoStack.push(JSON.stringify(appState.drafts));
+      const nextState = appState.redoStack.pop();
+      try {
+        appState.drafts = JSON.parse(nextState);
+        saveState();
+        renderApp();
+      } catch (err) {
+        console.error("Failed to redo:", err);
+      }
+      updateUndoRedoButtons();
+    }
+
+    function updateUndoRedoButtons() {
+      const undoBtn = document.getElementById('btn-undo');
+      const redoBtn = document.getElementById('btn-redo');
+
+      if (appState.undoStack && appState.undoStack.length > 0) {
+        undoBtn.disabled = false;
+        undoBtn.classList.remove('opacity-50', 'cursor-not-allowed');
       } else {
-        btn.disabled = true;
-        btn.classList.add('opacity-50', 'cursor-not-allowed');
+        undoBtn.disabled = true;
+        undoBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      }
+
+      if (appState.redoStack && appState.redoStack.length > 0) {
+        redoBtn.disabled = false;
+        redoBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      } else {
+        redoBtn.disabled = true;
+        redoBtn.classList.add('opacity-50', 'cursor-not-allowed');
       }
     }
 
+    // Keyboard Shortcuts: Ctrl+Z (Undo) & Ctrl+Y / Cmd+Shift+Z (Redo)
     window.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-        const activeTag = document.activeElement ? document.activeElement.tagName : '';
-        if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA') {
+      const activeTag = document.activeElement ? document.activeElement.tagName : '';
+      if (activeTag === 'INPUT' || activeTag === 'TEXTAREA') return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        if (e.shiftKey) {
+          e.preventDefault();
+          applyRedo();
+        } else {
           e.preventDefault();
           applyUndo();
         }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        applyRedo();
       }
     });
 
     document.getElementById('btn-undo').onclick = applyUndo;
+    document.getElementById('btn-redo').onclick = applyRedo;
 
+    // Load state safely
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        appState = JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        appState.theme = parsed.theme || 'light';
+        appState.showWeekend = parsed.showWeekend || false;
+        appState.activeDraftId = parsed.activeDraftId || 'draft-1';
+        appState.drafts = parsed.drafts || appState.drafts;
       } catch (e) {
         console.error("Failed to load saved state", e);
       }
     }
 
     function saveState() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      const toSave = {
+        theme: appState.theme,
+        showWeekend: appState.showWeekend,
+        activeDraftId: appState.activeDraftId,
+        drafts: appState.drafts
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
     }
 
     function getActiveDraft() {
@@ -717,7 +797,7 @@
       return clashes;
     }
 
-    // Weekend toggle button
+    // Weekend toggle
     document.getElementById('btn-toggle-weekend').onclick = () => {
       appState.showWeekend = !appState.showWeekend;
       saveState();
@@ -729,7 +809,7 @@
       document.getElementById('display-draft-name').textContent = draft.name;
       document.getElementById('weekend-toggle-label').textContent = appState.showWeekend ? 'Hide Weekend' : 'Show Weekend';
 
-      // Accurately tally credits: linked labs are already part of parent theory course
+      // Accurately tally credits: linked courses (theory or lab) add 0 extra credits
       const totalCredits = draft.courses.reduce((acc, c) => acc + (c.linkedParentId ? 0 : (parseInt(c.credits) || 0)), 0);
       const effectiveCourseCount = draft.courses.filter(c => !c.linkedParentId).length;
 
@@ -739,6 +819,7 @@
       renderDraftTabs();
       renderGrid();
       renderCourseTable();
+      updateUndoRedoButtons();
     }
 
     function renderDraftTabs() {
@@ -835,19 +916,34 @@
         td.style.color = textColor;
 
         const matchedSlot = occupiedCourse.slots.find(s => s.toUpperCase() === thSlot.toUpperCase() || s.toUpperCase() === lbSlot.toUpperCase()) || thSlot;
+        const typeLabel = occupiedCourse.type === 'Theory' ? 'THEORY' : 'LAB';
 
+        // Direct, bulletproof vertical layout with zero overlapping/clipping
         td.innerHTML = `
-          <div class="h-full w-full p-1.5 flex flex-col justify-between text-left select-none overflow-hidden">
-            <div class="flex items-center justify-between gap-1 leading-none">
-              <span class="text-[10px] font-mono font-bold opacity-80">${matchedSlot}</span>
-              ${occupiedCourse.venue ? `<span class="text-[9px] font-semibold opacity-75 truncate">${occupiedCourse.venue}</span>` : ''}
+          <div style="height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 5px 6px; box-sizing: border-box; overflow: hidden;">
+            <!-- Top line: Slot and Venue -->
+            <div style="display: flex; justify-content: space-between; align-items: center; line-height: 1; font-size: 10px; font-weight: 700;">
+              <span style="font-family: monospace; opacity: 0.85;">${matchedSlot}</span>
+              ${occupiedCourse.venue ? `<span style="font-size: 9px; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%;">${occupiedCourse.venue}</span>` : ''}
             </div>
-            <div class="text-[13.5px] font-extrabold leading-tight truncate-2-lines tracking-tight" style="line-height: 1.15;">
-              ${occupiedCourse.name}
+
+            <!-- Middle block: Course Name followed directly by Faculty Name -->
+            <div style="margin: 2px 0; line-height: 1.2;">
+              <div style="font-size: 12px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${occupiedCourse.name}">
+                ${occupiedCourse.name}
+              </div>
+              ${occupiedCourse.faculty ? `
+                <div style="font-size: 9.5px; font-weight: 600; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
+                  ${occupiedCourse.faculty}
+                </div>
+              ` : ''}
             </div>
-            <div class="flex items-center justify-between text-[9px] font-semibold opacity-80 leading-none truncate">
-              <span>${occupiedCourse.faculty || ''}</span>
-              <span class="uppercase tracking-wider font-bold text-[8.5px]">${occupiedCourse.linkedParentId ? 'Embedded Lab' : occupiedCourse.type}</span>
+
+            <!-- Bottom line: Type alone -->
+            <div style="display: flex; justify-content: flex-end; align-items: center; line-height: 1;">
+              <span style="font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.75;">
+                ${typeLabel}
+              </span>
             </div>
           </div>
         `;
@@ -882,37 +978,92 @@
         return;
       }
 
+      // Merge linked lab sessions into a single row representation
+      const processedCourseIds = new Set();
+      const rowsToRender = [];
+
       draft.courses.forEach(course => {
+        if (processedCourseIds.has(course.id)) return;
+
+        // Skip child lab session here (it will be merged with its parent)
+        if (course.type === 'Lab' && course.linkType === 'lab' && course.linkedParentId) {
+          return;
+        }
+
+        // Check if there is a child lab session linked to this course
+        const childLabSession = draft.courses.find(c => c.type === 'Lab' && c.linkType === 'lab' && c.linkedParentId === course.id);
+
+        if (childLabSession) {
+          processedCourseIds.add(course.id);
+          processedCourseIds.add(childLabSession.id);
+
+          const combinedSlots = [...course.slots, ...childLabSession.slots];
+          const combinedVenues = (course.venue && childLabSession.venue && course.venue !== childLabSession.venue)
+            ? `${course.venue}, ${childLabSession.venue}`
+            : (course.venue || childLabSession.venue || '—');
+
+          rowsToRender.push({
+            id: course.id,
+            childId: childLabSession.id,
+            name: course.name,
+            slotsText: combinedSlots.join(' + '),
+            typeBadge: `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300">Lab Only (2 Sessions)</span>`,
+            faculty: course.faculty || childLabSession.faculty || '—',
+            venue: combinedVenues,
+            credits: course.credits,
+            color: course.color,
+            isMergedLab: true
+          });
+        } else {
+          processedCourseIds.add(course.id);
+
+          let typeBadge = '';
+          if (course.type === 'Theory') {
+            typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">Theory</span>`;
+          } else if (course.linkedParentId && course.linkType === 'theory') {
+            const parent = draft.courses.find(c => c.id === course.linkedParentId);
+            typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">Lab (Linked to ${parent ? parent.name.substring(0, 10) : 'Theory'})</span>`;
+          } else {
+            typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">Standalone Lab</span>`;
+          }
+
+          rowsToRender.push({
+            id: course.id,
+            childId: null,
+            name: course.name,
+            slotsText: course.slots.join(' + '),
+            typeBadge: typeBadge,
+            faculty: course.faculty || '—',
+            venue: course.venue || '—',
+            credits: course.linkedParentId ? '<span class="text-[10px] text-slate-400 font-semibold">incl.</span>' : course.credits,
+            color: course.color,
+            isMergedLab: false,
+            originalCourse: course
+          });
+        }
+      });
+
+      rowsToRender.forEach(rowItem => {
         const tr = document.createElement('tr');
         tr.className = "hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer";
 
-        let typeBadge = '';
-        if (course.type === 'Theory') {
-          typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">Theory</span>`;
-        } else if (course.linkedParentId) {
-          const parent = draft.courses.find(c => c.id === course.linkedParentId);
-          typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">Lab (Linked to ${parent ? parent.name.substring(0, 12) : 'Theory'})</span>`;
-        } else {
-          typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">Standalone Lab</span>`;
-        }
-
         tr.innerHTML = `
           <td class="p-2.5 border-r dark:border-slate-700 text-center">
-            <span class="w-5 h-5 rounded-md inline-block border border-black/20 shadow-sm" style="background-color: ${course.color};"></span>
+            <span class="w-5 h-5 rounded-md inline-block border border-black/20 shadow-sm" style="background-color: ${rowItem.color};"></span>
           </td>
           <td class="p-2.5 border-r dark:border-slate-700 font-bold text-slate-800 dark:text-slate-100">
-            ${course.name}
+            ${rowItem.name}
           </td>
           <td class="p-2.5 border-r dark:border-slate-700 font-mono font-semibold text-blue-600 dark:text-blue-400">
-            ${course.slots.join(' + ')}
+            ${rowItem.slotsText}
           </td>
           <td class="p-2.5 border-r dark:border-slate-700">
-            ${typeBadge}
+            ${rowItem.typeBadge}
           </td>
-          <td class="p-2.5 border-r dark:border-slate-700">${course.faculty || '—'}</td>
-          <td class="p-2.5 border-r dark:border-slate-700 font-mono">${course.venue || '—'}</td>
+          <td class="p-2.5 border-r dark:border-slate-700">${rowItem.faculty}</td>
+          <td class="p-2.5 border-r dark:border-slate-700 font-mono">${rowItem.venue}</td>
           <td class="p-2.5 border-r dark:border-slate-700 text-center font-bold">
-            ${course.linkedParentId ? '<span class="text-[10px] text-slate-400 font-semibold">incl.</span>' : course.credits}
+            ${rowItem.credits}
           </td>
           <td class="p-2.5 text-center">
             <button class="btn-remove-course-row px-2 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-950/50 rounded transition" title="Remove course">
@@ -926,16 +1077,17 @@
           e.stopPropagation();
           openConfirmModal(
             "Remove Course",
-            `Are you sure you want to remove "${course.name}" (${course.slots.join(' + ')})?`,
+            `Are you sure you want to remove "${rowItem.name}" (${rowItem.slotsText})?`,
             () => {
               pushUndoSnapshot();
-              deleteCourse(course.id);
+              deleteCourse(rowItem.id);
             }
           );
         };
 
         tr.onclick = () => {
-          openCourseModalDirect(course);
+          const original = draft.courses.find(c => c.id === rowItem.id);
+          if (original) openCourseModalDirect(original);
         };
 
         tbody.appendChild(tr);
@@ -1001,24 +1153,8 @@
         }
       }
 
-      // Populate Theory courses into Parent Link dropdown
-      const parentSelect = document.getElementById('parent-theory-select');
-      parentSelect.innerHTML = '';
-      const theoryCourses = draft.courses.filter(c => c.type === 'Theory');
-
-      if (theoryCourses.length > 0) {
-        theoryCourses.forEach(tc => {
-          const opt = document.createElement('option');
-          opt.value = tc.id;
-          opt.textContent = `${tc.name} (${tc.slots.join('+')}) - ${tc.credits} Credits`;
-          parentSelect.appendChild(opt);
-        });
-      } else {
-        const opt = document.createElement('option');
-        opt.value = '';
-        opt.textContent = 'No Theory courses registered yet';
-        parentSelect.appendChild(opt);
-      }
+      // Populate Parent Dropdowns
+      populateParentDropdowns(draft, existingCourse);
 
       if (existingCourse) {
         document.getElementById('modal-title').textContent = 'Edit Course';
@@ -1047,8 +1183,13 @@
         }
 
         if (existingCourse.linkedParentId) {
-          document.getElementById('radio-lab-linked').checked = true;
-          parentSelect.value = existingCourse.linkedParentId;
+          if (existingCourse.linkType === 'lab') {
+            document.getElementById('radio-lab-linked-lab').checked = true;
+            document.getElementById('parent-lab-select').value = existingCourse.linkedParentId;
+          } else {
+            document.getElementById('radio-lab-linked-theory').checked = true;
+            document.getElementById('parent-theory-select').value = existingCourse.linkedParentId;
+          }
         } else {
           document.getElementById('radio-lab-standalone').checked = true;
         }
@@ -1086,15 +1227,7 @@
       opt.selected = true;
       slotSelect.appendChild(opt);
 
-      const parentSelect = document.getElementById('parent-theory-select');
-      parentSelect.innerHTML = '';
-      const theoryCourses = draft.courses.filter(c => c.type === 'Theory');
-      theoryCourses.forEach(tc => {
-        const o = document.createElement('option');
-        o.value = tc.id;
-        o.textContent = `${tc.name} (${tc.slots.join('+')}) - ${tc.credits} Credits`;
-        parentSelect.appendChild(o);
-      });
+      populateParentDropdowns(draft, course);
 
       document.getElementById('course-name-input').value = course.name;
       document.getElementById('faculty-name-input').value = course.faculty || '';
@@ -1103,8 +1236,13 @@
       document.getElementById('spectrum-color-input').value = course.color || '#c8f338';
 
       if (course.linkedParentId) {
-        document.getElementById('radio-lab-linked').checked = true;
-        parentSelect.value = course.linkedParentId;
+        if (course.linkType === 'lab') {
+          document.getElementById('radio-lab-linked-lab').checked = true;
+          document.getElementById('parent-lab-select').value = course.linkedParentId;
+        } else {
+          document.getElementById('radio-lab-linked-theory').checked = true;
+          document.getElementById('parent-theory-select').value = course.linkedParentId;
+        }
       } else {
         document.getElementById('radio-lab-standalone').checked = true;
       }
@@ -1112,6 +1250,46 @@
       deleteBtn.classList.remove('hidden');
       updateLabLinkingUI();
       modal.classList.remove('hidden');
+    }
+
+    function populateParentDropdowns(draft, currentCourse) {
+      // 1. Parent Theory Select
+      const parentTheorySelect = document.getElementById('parent-theory-select');
+      parentTheorySelect.innerHTML = '';
+      const theoryCourses = draft.courses.filter(c => c.type === 'Theory' && (!currentCourse || c.id !== currentCourse.id));
+
+      if (theoryCourses.length > 0) {
+        theoryCourses.forEach(tc => {
+          const opt = document.createElement('option');
+          opt.value = tc.id;
+          opt.textContent = `${tc.name} (${tc.slots.join('+')}) - ${tc.credits} Credits`;
+          parentTheorySelect.appendChild(opt);
+        });
+      } else {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'No Theory courses registered yet';
+        parentTheorySelect.appendChild(opt);
+      }
+
+      // 2. Parent Lab Select (Standalone labs available for linking session 2)
+      const parentLabSelect = document.getElementById('parent-lab-select');
+      parentLabSelect.innerHTML = '';
+      const standaloneLabs = draft.courses.filter(c => c.type === 'Lab' && !c.linkedParentId && (!currentCourse || c.id !== currentCourse.id));
+
+      if (standaloneLabs.length > 0) {
+        standaloneLabs.forEach(lc => {
+          const opt = document.createElement('option');
+          opt.value = lc.id;
+          opt.textContent = `${lc.name} (${lc.slots.join('+')}) - ${lc.credits} Credits`;
+          parentLabSelect.appendChild(opt);
+        });
+      } else {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'No standalone lab courses registered yet';
+        parentLabSelect.appendChild(opt);
+      }
     }
 
     function updateLabLinkingUI() {
@@ -1122,42 +1300,62 @@
       } catch (e) {}
 
       const labSection = document.getElementById('lab-link-section');
-      const parentWrap = document.getElementById('parent-theory-wrap');
+      const parentTheoryWrap = document.getElementById('parent-theory-wrap');
+      const parentLabWrap = document.getElementById('parent-lab-wrap');
       const creditsInput = document.getElementById('credits-input');
 
       if (isLab) {
         labSection.classList.remove('hidden');
-        const isLinked = document.getElementById('radio-lab-linked').checked;
-        if (isLinked) {
-          parentWrap.classList.remove('hidden');
+        const isTheoryLinked = document.getElementById('radio-lab-linked-theory').checked;
+        const isLabLinked = document.getElementById('radio-lab-linked-lab').checked;
+
+        if (isTheoryLinked) {
+          parentTheoryWrap.classList.remove('hidden');
+          parentLabWrap.classList.add('hidden');
           creditsInput.readOnly = true;
           creditsInput.classList.add('bg-slate-100', 'dark:bg-slate-800', 'opacity-60');
-          creditsInput.value = 0; // Linked lab adds 0 extra credits
-          syncParentDetails();
+          creditsInput.value = 0;
+          syncParentDetails('theory');
+        } else if (isLabLinked) {
+          parentLabWrap.classList.remove('hidden');
+          parentTheoryWrap.classList.add('hidden');
+          creditsInput.readOnly = true;
+          creditsInput.classList.add('bg-slate-100', 'dark:bg-slate-800', 'opacity-60');
+          creditsInput.value = 0;
+          syncParentDetails('lab');
         } else {
-          parentWrap.classList.add('hidden');
+          parentTheoryWrap.classList.add('hidden');
+          parentLabWrap.classList.add('hidden');
           creditsInput.readOnly = false;
           creditsInput.classList.remove('bg-slate-100', 'dark:bg-slate-800', 'opacity-60');
-          if (!currentEditCourseId || creditsInput.value == 0) creditsInput.value = 1;
+          if (!currentEditCourseId || creditsInput.value == 0) creditsInput.value = 2;
         }
       } else {
         labSection.classList.add('hidden');
-        parentWrap.classList.add('hidden');
+        parentTheoryWrap.classList.add('hidden');
+        parentLabWrap.classList.add('hidden');
         creditsInput.readOnly = false;
         creditsInput.classList.remove('bg-slate-100', 'dark:bg-slate-800', 'opacity-60');
         if (!currentEditCourseId) creditsInput.value = 3;
       }
     }
 
-    function syncParentDetails() {
-      const parentId = document.getElementById('parent-theory-select').value;
-      if (!parentId) return;
+    function syncParentDetails(type) {
       const draft = getActiveDraft();
+      let parentId = null;
+
+      if (type === 'theory') {
+        parentId = document.getElementById('parent-theory-select').value;
+      } else if (type === 'lab') {
+        parentId = document.getElementById('parent-lab-select').value;
+      }
+
+      if (!parentId) return;
       const parent = draft.courses.find(c => c.id === parentId);
       if (parent) {
         const nameInput = document.getElementById('course-name-input');
         if (!nameInput.value.trim() || nameInput.value.endsWith(' (Lab)')) {
-          nameInput.value = parent.name + ' (Lab)';
+          nameInput.value = parent.name.replace(/\s*\((Lab)\)$/, '');
         }
         document.getElementById('spectrum-color-input').value = parent.color;
       }
@@ -1165,8 +1363,10 @@
 
     document.getElementById('slot-select-input').onchange = updateLabLinkingUI;
     document.getElementById('radio-lab-standalone').onchange = updateLabLinkingUI;
-    document.getElementById('radio-lab-linked').onchange = updateLabLinkingUI;
-    document.getElementById('parent-theory-select').onchange = syncParentDetails;
+    document.getElementById('radio-lab-linked-theory').onchange = updateLabLinkingUI;
+    document.getElementById('radio-lab-linked-lab').onchange = updateLabLinkingUI;
+    document.getElementById('parent-theory-select').onchange = () => syncParentDetails('theory');
+    document.getElementById('parent-lab-select').onchange = () => syncParentDetails('lab');
 
     function closeCourseModal() {
       document.getElementById('course-modal').classList.add('hidden');
@@ -1176,10 +1376,19 @@
     document.getElementById('btn-close-course-modal').onclick = closeCourseModal;
     document.getElementById('btn-cancel-modal').onclick = closeCourseModal;
 
-    document.querySelectorAll('.preset-color').forEach(btn => {
+    // Render 10 Preset Colors
+    const presetBox = document.getElementById('preset-colors-container');
+    presetBox.innerHTML = '';
+    PRESET_COLORS.forEach(c => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'w-5 h-5 rounded-full border border-black/20 hover:scale-110 transition shadow-sm';
+      btn.style.backgroundColor = c.hex;
+      btn.title = c.name;
       btn.onclick = () => {
-        document.getElementById('spectrum-color-input').value = btn.dataset.color;
+        document.getElementById('spectrum-color-input').value = c.hex;
       };
+      presetBox.appendChild(btn);
     });
 
     document.getElementById('course-form').onsubmit = (e) => {
@@ -1202,8 +1411,15 @@
       if (!name || !slotData) return;
 
       let linkedParentId = null;
-      if (slotData.type === 'Lab' && document.getElementById('radio-lab-linked').checked) {
-        linkedParentId = document.getElementById('parent-theory-select').value || null;
+      let linkType = null;
+      if (slotData.type === 'Lab') {
+        if (document.getElementById('radio-lab-linked-theory').checked) {
+          linkedParentId = document.getElementById('parent-theory-select').value || null;
+          linkType = 'theory';
+        } else if (document.getElementById('radio-lab-linked-lab').checked) {
+          linkedParentId = document.getElementById('parent-lab-select').value || null;
+          linkType = 'lab';
+        }
       }
 
       const clashes = detectPhysicalClashes(draft, slotData.slots, currentEditCourseId);
@@ -1223,10 +1439,10 @@
       }
 
       pushUndoSnapshot();
-      saveCourseData(draft, name, faculty, venue, credits, color, slotData, linkedParentId);
+      saveCourseData(draft, name, faculty, venue, credits, color, slotData, linkedParentId, linkType);
     };
 
-    function saveCourseData(draft, name, faculty, venue, credits, color, slotData, linkedParentId) {
+    function saveCourseData(draft, name, faculty, venue, credits, color, slotData, linkedParentId, linkType) {
       if (currentEditCourseId) {
         const idx = draft.courses.findIndex(c => c.id === currentEditCourseId);
         if (idx !== -1) {
@@ -1239,7 +1455,8 @@
             color,
             slots: slotData.slots,
             type: slotData.type,
-            linkedParentId: linkedParentId || null
+            linkedParentId: linkedParentId || null,
+            linkType: linkType || null
           };
         }
       } else {
@@ -1252,7 +1469,8 @@
           color,
           slots: slotData.slots,
           type: slotData.type,
-          linkedParentId: linkedParentId || null
+          linkedParentId: linkedParentId || null,
+          linkType: linkType || null
         });
       }
 
@@ -1443,39 +1661,131 @@
       document.getElementById('compare-modal').classList.add('hidden');
     };
 
-    // --- Image Capture via html2canvas ---
-    document.getElementById('btn-capture').onclick = () => {
+    // --- Image Capture via html2canvas (full-width, unclipped timetable) ---
+    document.getElementById('btn-capture').onclick = async () => {
       const captureArea = document.getElementById('timetable-capture-area');
+      const captureButton = document.getElementById('btn-capture');
       const draft = getActiveDraft();
       const isDark = document.documentElement.classList.contains('dark');
-      const originalBg = isDark ? '#0f172a' : '#ffffff';
+      const originalBtnHtml = captureButton.innerHTML;
 
-      const originalBtnHtml = document.getElementById('btn-capture').innerHTML;
-      document.getElementById('btn-capture').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+      // Capture an isolated clone so the live timetable and its scroll position
+      // are never changed while the PNG is being generated.
+      let captureHost;
+      captureButton.disabled = true;
+      captureButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
 
-      const prevOverflow = captureArea.style.overflow;
-      captureArea.style.overflow = 'visible';
+      try {
+        if (document.fonts && document.fonts.ready) {
+          await document.fonts.ready;
+        }
 
-      html2canvas(captureArea, {
-        scale: 2,
-        backgroundColor: originalBg,
-        useCORS: true,
-        logging: false,
-        windowWidth: 1400
-      }).then(canvas => {
-        captureArea.style.overflow = prevOverflow;
-        document.getElementById('btn-capture').innerHTML = originalBtnHtml;
+        const table = captureArea.querySelector('table');
+        const captureWidth = Math.ceil(Math.max(
+          table ? table.scrollWidth : 0,
+          captureArea.scrollWidth,
+          captureArea.clientWidth
+        ));
+
+        captureHost = document.createElement('div');
+        captureHost.style.cssText = [
+          'position: fixed',
+          'left: -100000px',
+          'top: 0',
+          'z-index: -1',
+          'width: ' + captureWidth + 'px',
+          'background: ' + (isDark ? '#0f172a' : '#ffffff'),
+          'overflow: visible'
+        ].join(';');
+
+        const clone = captureArea.cloneNode(true);
+        clone.style.cssText +=
+          ';width:' + captureWidth + 'px;max-width:none;min-width:0;' +
+          'height:auto;overflow:visible;box-sizing:border-box;';
+
+        // html2canvas can miscalculate percentage-height flex content inside
+        // fixed-height table cells. Give the exported copy enough room and let
+        // course/faculty text wrap instead of being cut off.
+        const captureStyles = document.createElement('style');
+        captureStyles.textContent = `
+          #timetable-capture-area table {
+            width: ${captureWidth - 16}px !important;
+            min-width: ${captureWidth - 16}px !important;
+            table-layout: fixed !important;
+          }
+          #timetable-capture-area .slot-cell {
+            height: 112px !important;
+            min-height: 112px !important;
+            max-height: none !important;
+            overflow: visible !important;
+          }
+          #timetable-capture-area .slot-cell > div {
+            height: auto !important;
+            min-height: 100% !important;
+            overflow: visible !important;
+            justify-content: space-between !important;
+            padding: 7px 6px !important;
+          }
+          #timetable-capture-area .slot-cell > div > div:nth-child(2) {
+            flex: 0 0 auto !important;
+            min-height: 0 !important;
+            margin: 5px 0 !important;
+            line-height: 1.25 !important;
+            overflow: visible !important;
+            white-space: normal !important;
+          }
+          #timetable-capture-area .slot-cell > div > div:nth-child(2) > div {
+            white-space: normal !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            overflow-wrap: anywhere !important;
+            max-height: 2.5em !important;
+          }
+          #timetable-capture-area .slot-cell > div > div:nth-child(2) > div + div {
+            white-space: normal !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            overflow-wrap: anywhere !important;
+            max-height: 2.5em !important;
+          }
+        `;
+
+        clone.prepend(captureStyles);
+        captureHost.appendChild(clone);
+        document.body.appendChild(captureHost);
+
+        // Allow the browser to complete layout of the off-screen clone.
+        await new Promise(resolve => requestAnimationFrame(() =>
+          requestAnimationFrame(resolve)
+        ));
+
+        const canvas = await html2canvas(clone, {
+          scale: 2,
+          backgroundColor: isDark ? '#0f172a' : '#ffffff',
+          useCORS: true,
+          logging: false,
+          width: captureWidth,
+          windowWidth: Math.max(window.innerWidth, captureWidth),
+          height: clone.scrollHeight,
+          onclone: clonedDocument => {
+            clonedDocument.documentElement.classList.toggle('dark', isDark);
+          }
+        });
 
         const link = document.createElement('a');
-        link.download = `${draft.name.replace(/\s+/g, '_')}_FFCS_Timetable.png`;
+        link.download = `${draft.name.replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, '_')}_FFCS_Timetable.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
-      }).catch(err => {
-        captureArea.style.overflow = prevOverflow;
-        document.getElementById('btn-capture').innerHTML = originalBtnHtml;
-        console.error("Capture failed:", err);
-        alert("Failed to capture image. Please try again.");
-      });
+      } catch (err) {
+        console.error('Capture failed:', err);
+        alert('Failed to capture image. Please try again.');
+      } finally {
+        if (captureHost && captureHost.parentNode) {
+          captureHost.parentNode.removeChild(captureHost);
+        }
+        captureButton.disabled = false;
+        captureButton.innerHTML = originalBtnHtml;
+      }
     };
 
     // --- Theme Switcher ---
@@ -1501,7 +1811,7 @@
 
     applyTheme(appState.theme || 'light');
     renderApp();
-    updateUndoButton();
+    updateUndoRedoButtons();
   </script>
 </body>
 </html>
