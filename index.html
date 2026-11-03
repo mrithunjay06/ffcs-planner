@@ -22,7 +22,6 @@
       }
     }
   </script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
@@ -35,11 +34,9 @@
       min-width: 1200px;
     }
     .slot-cell {
-      height: 88px;
-      min-height: 88px;
-      max-height: 88px;
+      height: 92px;
+      min-height: 92px;
       width: 100%;
-      overflow: hidden;
       position: relative;
       cursor: pointer;
       user-select: none;
@@ -112,9 +109,19 @@
           <i class="fa-solid fa-camera"></i> Capture PNG
         </button>
 
-        <button id="btn-theme-toggle" class="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition text-sm w-8 h-8 flex items-center justify-center" title="Toggle Theme">
-          <i class="fa-solid fa-moon" id="theme-icon"></i>
-        </button>
+        <!-- Togglable Dark Mode Switch -->
+        <label for="theme-toggle-checkbox" class="flex items-center cursor-pointer select-none ml-1" title="Toggle Light / Dark Mode">
+          <div class="relative">
+            <input type="checkbox" id="theme-toggle-checkbox" class="sr-only">
+            <div class="w-14 h-7 bg-slate-700/80 border border-white/20 rounded-full shadow-inner flex items-center justify-between px-1.5 text-[11px]">
+              <i class="fa-solid fa-sun text-amber-300"></i>
+              <i class="fa-solid fa-moon text-blue-200"></i>
+            </div>
+            <div id="theme-switch-thumb" class="dot absolute left-1 top-1 bg-white w-5 h-5 rounded-full shadow-md transition-transform duration-200 ease-in-out flex items-center justify-center">
+              <i id="theme-thumb-icon" class="fa-solid fa-sun text-[10px] text-amber-500"></i>
+            </div>
+          </div>
+        </label>
       </div>
     </div>
   </header>
@@ -242,7 +249,8 @@
           <thead class="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold uppercase text-[11px]">
             <tr>
               <th class="p-2.5 border-b border-r dark:border-slate-700">Color</th>
-              <th class="p-2.5 border-b border-r dark:border-slate-700">Course Name / Code</th>
+              <th class="p-2.5 border-b border-r dark:border-slate-700">Course Code</th>
+              <th class="p-2.5 border-b border-r dark:border-slate-700">Course Name</th>
               <th class="p-2.5 border-b border-r dark:border-slate-700">Slots</th>
               <th class="p-2.5 border-b border-r dark:border-slate-700">Type / Classification</th>
               <th class="p-2.5 border-b border-r dark:border-slate-700">Faculty</th>
@@ -282,7 +290,7 @@
       <div class="bg-[#0d2847] text-white px-5 py-3.5 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-2">
           <i class="fa-solid fa-graduation-cap text-blue-300"></i>
-          <h3 class="font-bold text-sm tracking-wide" id="modal-title">Configure Course Slot</h3>
+          <h3 class="font-bold text-sm tracking-wide" id="modal-title">Register Course</h3>
         </div>
         <button id="btn-close-course-modal" class="text-slate-300 hover:text-white text-lg leading-none">&times;</button>
       </div>
@@ -307,7 +315,7 @@
           <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Multi-slots automatically occupy matching weekly periods.</p>
         </div>
 
-        <!-- Dynamic Lab Linking Section (Standalone vs Link to Theory vs Link to Another Lab) -->
+        <!-- Dynamic Lab Linking Section -->
         <div id="lab-link-section" class="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800/60 space-y-2 hidden">
           <span class="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
             <i class="fa-solid fa-link text-amber-600 dark:text-amber-400"></i> Course Classification:
@@ -332,7 +340,7 @@
             <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Select Parent Theory Course:</label>
             <select id="parent-theory-select" class="w-full text-xs px-2.5 py-1.5 border rounded-lg bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none"></select>
             <p class="text-[10px] text-amber-800 dark:text-amber-300 mt-1 leading-tight">
-              Inherits name & color. Lab credits are counted within the theory course.
+              Syncs course name, code & color across both slots. Lab credits are counted within the theory course.
             </p>
           </div>
 
@@ -341,11 +349,12 @@
             <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Select Previous Lab Session to Link:</label>
             <select id="parent-lab-select" class="w-full text-xs px-2.5 py-1.5 border rounded-lg bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none"></select>
             <p class="text-[10px] text-amber-800 dark:text-amber-300 mt-1 leading-tight">
-              Connects to your previous lab session (2 sessions/week). Both will merge into a single row with combined slots.
+              Connects to your previous lab session (2 sessions/week). Merges into a single row and syncs details automatically.
             </p>
           </div>
         </div>
 
+        <!-- Course Title (Full Width) -->
         <div>
           <label class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
             Course Title <span class="text-rose-500">*</span>
@@ -354,12 +363,13 @@
             class="w-full text-xs px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
 
+        <!-- Course Code (Optional, Full Width Directly Below Title) -->
         <div>
           <label class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
-            Course Code <span class="font-normal normal-case text-slate-400">(Optional)</span>
+            Course Code <span class="font-normal capitalize text-slate-400">(Optional)</span>
           </label>
-          <input type="text" id="course-code-input" placeholder="e.g., BCSE303L"
-            class="w-full text-xs px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <input type="text" id="course-code-input" placeholder="e.g., BCSE303L" 
+            class="w-full text-xs px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white uppercase focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
 
         <div class="grid grid-cols-2 gap-3">
@@ -375,7 +385,7 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3 items-center">
+        <div class="grid grid-cols-2 gap-3 items-start">
           <div>
             <label class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">Credits</label>
             <input type="number" id="credits-input" min="0" max="6" value="3" 
@@ -385,9 +395,7 @@
             <label class="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">Slot Color</label>
             <div class="flex items-center gap-2">
               <input type="color" id="spectrum-color-input" value="#c8f338" class="w-8 h-8 rounded border border-slate-300 dark:border-slate-700 cursor-pointer p-0 shrink-0">
-              <div id="preset-colors-container" class="flex flex-wrap items-center gap-1.5">
-                <!-- 10 Preset colors rendered dynamically -->
-              </div>
+              <div id="preset-colors-container" class="flex flex-wrap items-center gap-1.5"></div>
             </div>
           </div>
         </div>
@@ -442,6 +450,11 @@
     const PERIOD_TIMINGS_12H = [
       '08:00 - 08:50', '08:55 - 09:45', '09:50 - 10:40', '10:45 - 11:35', '11:40 - 12:30', '12:35 - 1:25',
       '2:00 - 2:50', '2:55 - 3:45', '3:50 - 4:40', '4:45 - 5:35', '5:40 - 6:30', '6:35 - 7:25'
+    ];
+
+    const LAB_TIMINGS_12H = [
+      '08:00 - 08:50', '08:50 - 09:40', '09:50 - 10:40', '10:40 - 11:30', '11:40 - 12:30', '12:30 - 1:20',
+      '2:00 - 2:50', '2:50 - 3:40', '3:50 - 4:40', '4:40 - 5:30', '5:40 - 6:30', '6:30 - 7:20'
     ];
 
     const SLOT_MATRIX = {
@@ -527,7 +540,6 @@
       'TG2': { single: ['G2'], double: ['G2', 'TG2'], triple: null }
     };
 
-    // 10 Distinct Preset Colors
     const PRESET_COLORS = [
       { hex: '#c8f338', name: 'VIT Lime' },
       { hex: '#86efac', name: 'Mint' },
@@ -541,7 +553,7 @@
       { hex: '#fde68a', name: 'Warm Sand' }
     ];
 
-    const STORAGE_KEY = 'vit_ffcs_state_v12';
+    const STORAGE_KEY = 'vit_ffcs_state_v17';
 
     let appState = {
       theme: 'light',
@@ -558,7 +570,6 @@
       ]
     };
 
-    // Undo & Redo History System
     function pushUndoSnapshot() {
       const snapshot = JSON.stringify(appState.drafts);
       appState.undoStack.push(snapshot);
@@ -616,7 +627,6 @@
       }
     }
 
-    // Keyboard Shortcuts: Ctrl+Z (Undo) & Ctrl+Y / Cmd+Shift+Z (Redo)
     window.addEventListener('keydown', (e) => {
       const activeTag = document.activeElement ? document.activeElement.tagName : '';
       if (activeTag === 'INPUT' || activeTag === 'TEXTAREA') return;
@@ -638,7 +648,6 @@
     document.getElementById('btn-undo').onclick = applyUndo;
     document.getElementById('btn-redo').onclick = applyRedo;
 
-    // Load state safely
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
@@ -805,7 +814,6 @@
       return clashes;
     }
 
-    // Weekend toggle
     document.getElementById('btn-toggle-weekend').onclick = () => {
       appState.showWeekend = !appState.showWeekend;
       saveState();
@@ -817,7 +825,6 @@
       document.getElementById('display-draft-name').textContent = draft.name;
       document.getElementById('weekend-toggle-label').textContent = appState.showWeekend ? 'Hide Weekend' : 'Show Weekend';
 
-      // Accurately tally credits: linked courses (theory or lab) add 0 extra credits
       const totalCredits = draft.courses.reduce((acc, c) => acc + (c.linkedParentId ? 0 : (parseInt(c.credits) || 0)), 0);
       const effectiveCourseCount = draft.courses.filter(c => !c.linkedParentId).length;
 
@@ -846,7 +853,7 @@
         btn.innerHTML = `
           <span>${d.name}</span>
           <span class="text-[10px] px-1.5 py-0.2 rounded-full ${isActive ? 'bg-blue-800 text-blue-100' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}">
-            ${d.courses.length}
+            ${d.courses.filter(c => !c.linkedParentId).length}
           </span>
         `;
         btn.onclick = () => {
@@ -875,7 +882,6 @@
         const row = document.createElement('tr');
         row.className = "border-b border-slate-300 dark:border-slate-700";
 
-        // Day label
         const dayCell = document.createElement('td');
         dayCell.className = "border border-slate-300 dark:border-slate-700 font-extrabold text-xs uppercase bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 p-1";
         dayCell.textContent = day;
@@ -883,12 +889,10 @@
 
         const periods = SLOT_MATRIX[day];
 
-        // Morning Periods 0 to 5
         for (let p = 0; p < 6; p++) {
           row.appendChild(createSlotCell(day, p, periods[p], slotCourseMap));
         }
 
-        // Single Uniform LUNCH Cell spanning through all visible days
         if (dayIndex === 0) {
           const lunchCell = document.createElement('td');
           lunchCell.rowSpan = visibleDays.length;
@@ -897,7 +901,6 @@
           row.appendChild(lunchCell);
         }
 
-        // Afternoon Periods 6 to 11
         for (let p = 6; p < 12; p++) {
           row.appendChild(createSlotCell(day, p, periods[p], slotCourseMap));
         }
@@ -906,6 +909,7 @@
       });
     }
 
+    // Outer timetable cell: displays ONLY Course Name (not Course Code)
     function createSlotCell(day, periodIndex, slotObj, slotCourseMap) {
       const td = document.createElement('td');
       td.className = "border border-slate-300 dark:border-slate-700 p-0 relative slot-cell";
@@ -926,28 +930,24 @@
         const matchedSlot = occupiedCourse.slots.find(s => s.toUpperCase() === thSlot.toUpperCase() || s.toUpperCase() === lbSlot.toUpperCase()) || thSlot;
         const typeLabel = occupiedCourse.type === 'Theory' ? 'THEORY' : 'LAB';
 
-        // Direct, bulletproof vertical layout with zero overlapping/clipping
         td.innerHTML = `
-          <div style="height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 5px 6px; box-sizing: border-box; overflow: hidden;">
-            <!-- Top line: Slot and Venue -->
-            <div style="display: flex; justify-content: space-between; align-items: center; line-height: 1; font-size: 10px; font-weight: 700;">
+          <div style="height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 6px; box-sizing: border-box;">
+            <div style="display: flex; justify-content: space-between; align-items: center; line-height: 1.1; font-size: 10px; font-weight: 700;">
               <span style="font-family: monospace; opacity: 0.85;">${matchedSlot}</span>
-              ${occupiedCourse.venue ? `<span style="font-size: 9px; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%;">${occupiedCourse.venue}</span>` : ''}
+              ${occupiedCourse.venue ? `<span style="font-size: 9px; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 62%;">${occupiedCourse.venue}</span>` : ''}
             </div>
 
-            <!-- Middle block: Course Name followed directly by Faculty Name -->
-            <div style="margin: 2px 0; line-height: 1.2;">
-              <div style="font-size: 12px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${occupiedCourse.name}">
+            <div style="margin: 2px 0; line-height: 1.25; text-align: left;">
+              <div style="font-size: 12px; font-weight: 800; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="${occupiedCourse.name}">
                 ${occupiedCourse.name}
               </div>
               ${occupiedCourse.faculty ? `
-                <div style="font-size: 9.5px; font-weight: 600; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
+                <div style="font-size: 9.5px; font-weight: 600; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
                   ${occupiedCourse.faculty}
                 </div>
               ` : ''}
             </div>
 
-            <!-- Bottom line: Type alone -->
             <div style="display: flex; justify-content: flex-end; align-items: center; line-height: 1;">
               <span style="font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.75;">
                 ${typeLabel}
@@ -978,7 +978,7 @@
       if (draft.courses.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="8" class="text-center py-6 text-slate-400 dark:text-slate-500 italic">
+            <td colspan="9" class="text-center py-6 text-slate-400 dark:text-slate-500 italic">
               No courses registered in this draft yet. Click any slot in the timetable above to register a course.
             </td>
           </tr>
@@ -986,41 +986,41 @@
         return;
       }
 
-      // Merge linked lab sessions into a single row representation
       const processedCourseIds = new Set();
       const rowsToRender = [];
 
       draft.courses.forEach(course => {
         if (processedCourseIds.has(course.id)) return;
 
-        // Skip child lab session here (it will be merged with its parent)
+        // Skip child lab session (merged into its parent standalone lab row)
         if (course.type === 'Lab' && course.linkType === 'lab' && course.linkedParentId) {
           return;
         }
 
-        // Check if there is a child lab session linked to this course
-        const childLabSession = draft.courses.find(c => c.type === 'Lab' && c.linkType === 'lab' && c.linkedParentId === course.id);
+        // Check if there are any child lab sessions linked to this standalone lab course
+        const childLabSessions = draft.courses.filter(c => c.type === 'Lab' && c.linkType === 'lab' && c.linkedParentId === course.id);
 
-        if (childLabSession) {
+        if (childLabSessions.length > 0) {
           processedCourseIds.add(course.id);
-          processedCourseIds.add(childLabSession.id);
+          childLabSessions.forEach(ch => processedCourseIds.add(ch.id));
 
-          const combinedSlots = [...course.slots, ...childLabSession.slots];
-          const combinedVenues = (course.venue && childLabSession.venue && course.venue !== childLabSession.venue)
-            ? `${course.venue}, ${childLabSession.venue}`
-            : (course.venue || childLabSession.venue || '—');
+          const combinedSlots = [
+            ...course.slots,
+            ...childLabSessions.flatMap(ch => ch.slots)
+          ];
+          const allVenues = [course.venue, ...childLabSessions.map(ch => ch.venue)].filter(Boolean);
+          const uniqueVenues = [...new Set(allVenues)];
 
           rowsToRender.push({
             id: course.id,
-            childId: childLabSession.id,
+            code: course.code || (childLabSessions[0] && childLabSessions[0].code) || '—',
             name: course.name,
             slotsText: combinedSlots.join(' + '),
-            typeBadge: `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300">Lab Only (2 Sessions)</span>`,
-            faculty: course.faculty || childLabSession.faculty || '—',
-            venue: combinedVenues,
+            typeBadge: `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300">Lab Only (${childLabSessions.length + 1} Sessions)</span>`,
+            faculty: course.faculty || (childLabSessions[0] && childLabSessions[0].faculty) || '—',
+            venue: uniqueVenues.length > 0 ? uniqueVenues.join(', ') : '—',
             credits: course.credits,
-            color: course.color,
-            isMergedLab: true
+            color: course.color
           });
         } else {
           processedCourseIds.add(course.id);
@@ -1030,23 +1030,21 @@
             typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">Theory</span>`;
           } else if (course.linkedParentId && course.linkType === 'theory') {
             const parent = draft.courses.find(c => c.id === course.linkedParentId);
-            typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">Lab (Linked to ${parent ? parent.name.substring(0, 10) : 'Theory'})</span>`;
+            typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">Lab (Linked to ${parent ? parent.name.substring(0, 12) : 'Theory'})</span>`;
           } else {
             typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">Standalone Lab</span>`;
           }
 
           rowsToRender.push({
             id: course.id,
-            childId: null,
+            code: course.code || '—',
             name: course.name,
             slotsText: course.slots.join(' + '),
             typeBadge: typeBadge,
             faculty: course.faculty || '—',
             venue: course.venue || '—',
             credits: course.linkedParentId ? '<span class="text-[10px] text-slate-400 font-semibold">incl.</span>' : course.credits,
-            color: course.color,
-            isMergedLab: false,
-            originalCourse: course
+            color: course.color
           });
         }
       });
@@ -1058,6 +1056,9 @@
         tr.innerHTML = `
           <td class="p-2.5 border-r dark:border-slate-700 text-center">
             <span class="w-5 h-5 rounded-md inline-block border border-black/20 shadow-sm" style="background-color: ${rowItem.color};"></span>
+          </td>
+          <td class="p-2.5 border-r dark:border-slate-700 font-mono font-bold text-slate-600 dark:text-slate-300">
+            ${rowItem.code}
           </td>
           <td class="p-2.5 border-r dark:border-slate-700 font-bold text-slate-800 dark:text-slate-100">
             ${rowItem.name}
@@ -1118,7 +1119,6 @@
       const th = slotObj.th;
       const lb = slotObj.lb;
 
-      // 1. Standard Theory Clusters (Single, Double, Triple)
       if (th !== '-') {
         const clusterInfo = THEORY_CLUSTER_TIERS[th];
         if (clusterInfo) {
@@ -1148,7 +1148,6 @@
         }
       }
 
-      // 2. Strict Continuous 2-Period Lab Session
       if (lb !== '-') {
         const lbNum = parseInt(lb.replace(/\D/g, ''));
         if (!isNaN(lbNum)) {
@@ -1161,7 +1160,6 @@
         }
       }
 
-      // Populate Parent Dropdowns
       populateParentDropdowns(draft, existingCourse);
 
       if (existingCourse) {
@@ -1202,6 +1200,7 @@
         } else {
           document.getElementById('radio-lab-standalone').checked = true;
         }
+        updateLabLinkingUI(false);
       } else {
         document.getElementById('modal-title').textContent = 'Register Course';
         document.getElementById('course-name-input').value = '';
@@ -1212,9 +1211,9 @@
         document.getElementById('spectrum-color-input').value = '#c8f338';
         document.getElementById('radio-lab-standalone').checked = true;
         deleteBtn.classList.add('hidden');
+        updateLabLinkingUI(true);
       }
 
-      updateLabLinkingUI();
       modal.classList.remove('hidden');
       document.getElementById('course-name-input').focus();
     }
@@ -1259,12 +1258,11 @@
       }
 
       deleteBtn.classList.remove('hidden');
-      updateLabLinkingUI();
+      updateLabLinkingUI(false);
       modal.classList.remove('hidden');
     }
 
     function populateParentDropdowns(draft, currentCourse) {
-      // 1. Parent Theory Select
       const parentTheorySelect = document.getElementById('parent-theory-select');
       parentTheorySelect.innerHTML = '';
       const theoryCourses = draft.courses.filter(c => c.type === 'Theory' && (!currentCourse || c.id !== currentCourse.id));
@@ -1273,7 +1271,7 @@
         theoryCourses.forEach(tc => {
           const opt = document.createElement('option');
           opt.value = tc.id;
-          opt.textContent = `${tc.name} (${tc.slots.join('+')}) - ${tc.credits} Credits`;
+          opt.textContent = `${tc.code ? tc.code + ' - ' : ''}${tc.name} (${tc.slots.join('+')}) - ${tc.credits} Credits`;
           parentTheorySelect.appendChild(opt);
         });
       } else {
@@ -1283,7 +1281,6 @@
         parentTheorySelect.appendChild(opt);
       }
 
-      // 2. Parent Lab Select (Standalone labs available for linking session 2)
       const parentLabSelect = document.getElementById('parent-lab-select');
       parentLabSelect.innerHTML = '';
       const standaloneLabs = draft.courses.filter(c => c.type === 'Lab' && !c.linkedParentId && (!currentCourse || c.id !== currentCourse.id));
@@ -1292,7 +1289,7 @@
         standaloneLabs.forEach(lc => {
           const opt = document.createElement('option');
           opt.value = lc.id;
-          opt.textContent = `${lc.name} (${lc.slots.join('+')}) - ${lc.credits} Credits`;
+          opt.textContent = `${lc.code ? lc.code + ' - ' : ''}${lc.name} (${lc.slots.join('+')}) - ${lc.credits} Credits`;
           parentLabSelect.appendChild(opt);
         });
       } else {
@@ -1303,7 +1300,7 @@
       }
     }
 
-    function updateLabLinkingUI() {
+    function updateLabLinkingUI(shouldSyncDetails = true) {
       let isLab = false;
       try {
         const slotVal = JSON.parse(document.getElementById('slot-select-input').value);
@@ -1326,14 +1323,14 @@
           creditsInput.readOnly = true;
           creditsInput.classList.add('bg-slate-100', 'dark:bg-slate-800', 'opacity-60');
           creditsInput.value = 0;
-          syncParentDetails('theory');
+          if (shouldSyncDetails) syncParentDetails('theory');
         } else if (isLabLinked) {
           parentLabWrap.classList.remove('hidden');
           parentTheoryWrap.classList.add('hidden');
           creditsInput.readOnly = true;
           creditsInput.classList.add('bg-slate-100', 'dark:bg-slate-800', 'opacity-60');
           creditsInput.value = 0;
-          syncParentDetails('lab');
+          if (shouldSyncDetails) syncParentDetails('lab');
         } else {
           parentTheoryWrap.classList.add('hidden');
           parentLabWrap.classList.add('hidden');
@@ -1364,18 +1361,16 @@
       if (!parentId) return;
       const parent = draft.courses.find(c => c.id === parentId);
       if (parent) {
-        const nameInput = document.getElementById('course-name-input');
-        if (!nameInput.value.trim() || nameInput.value.endsWith(' (Lab)')) {
-          nameInput.value = parent.name.replace(/\s*\((Lab)\)$/, '');
-        }
+        document.getElementById('course-name-input').value = parent.name;
+        document.getElementById('course-code-input').value = parent.code || '';
         document.getElementById('spectrum-color-input').value = parent.color;
       }
     }
 
-    document.getElementById('slot-select-input').onchange = updateLabLinkingUI;
-    document.getElementById('radio-lab-standalone').onchange = updateLabLinkingUI;
-    document.getElementById('radio-lab-linked-theory').onchange = updateLabLinkingUI;
-    document.getElementById('radio-lab-linked-lab').onchange = updateLabLinkingUI;
+    document.getElementById('slot-select-input').onchange = () => updateLabLinkingUI(true);
+    document.getElementById('radio-lab-standalone').onchange = () => updateLabLinkingUI(true);
+    document.getElementById('radio-lab-linked-theory').onchange = () => updateLabLinkingUI(true);
+    document.getElementById('radio-lab-linked-lab').onchange = () => updateLabLinkingUI(true);
     document.getElementById('parent-theory-select').onchange = () => syncParentDetails('theory');
     document.getElementById('parent-lab-select').onchange = () => syncParentDetails('lab');
 
@@ -1387,7 +1382,6 @@
     document.getElementById('btn-close-course-modal').onclick = closeCourseModal;
     document.getElementById('btn-cancel-modal').onclick = closeCourseModal;
 
-    // Render 10 Preset Colors
     const presetBox = document.getElementById('preset-colors-container');
     presetBox.innerHTML = '';
     PRESET_COLORS.forEach(c => {
@@ -1407,7 +1401,7 @@
       const draft = getActiveDraft();
 
       const name = document.getElementById('course-name-input').value.trim();
-      const code = document.getElementById('course-code-input').value.trim();
+      const code = document.getElementById('course-code-input').value.trim().toUpperCase();
       const faculty = document.getElementById('faculty-name-input').value.trim();
       const venue = document.getElementById('venue-name-input').value.trim();
       const credits = parseInt(document.getElementById('credits-input').value) || 0;
@@ -1455,6 +1449,8 @@
     };
 
     function saveCourseData(draft, name, code, faculty, venue, credits, color, slotData, linkedParentId, linkType) {
+      let targetId = currentEditCourseId;
+
       if (currentEditCourseId) {
         const idx = draft.courses.findIndex(c => c.id === currentEditCourseId);
         if (idx !== -1) {
@@ -1473,8 +1469,9 @@
           };
         }
       } else {
+        targetId = 'course-' + Date.now();
         draft.courses.push({
-          id: 'course-' + Date.now(),
+          id: targetId,
           name,
           code,
           faculty,
@@ -1487,6 +1484,18 @@
           linkType: linkType || null
         });
       }
+
+      // Bidirectional Group Synchronization for Name, Code, and Color
+      const rootId = linkedParentId || targetId;
+      draft.courses.forEach(c => {
+        if (c.id === rootId || c.linkedParentId === rootId) {
+          c.color = color;
+          c.name = name;
+          if (code) {
+            c.code = code;
+          }
+        }
+      });
 
       saveState();
       closeCourseModal();
@@ -1620,7 +1629,9 @@
               <div class="flex items-center justify-between text-xs py-1 border-b border-slate-200/60 dark:border-slate-700/60">
                 <div class="flex items-center gap-2 truncate">
                   <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color:${c.color};"></span>
-                  <span class="font-bold truncate text-slate-800 dark:text-slate-100">${c.name}</span>
+                  <span class="font-bold truncate text-slate-800 dark:text-slate-100">
+                    ${c.code ? `<span class="font-mono text-[10px] text-slate-500 dark:text-slate-400 mr-1">[${c.code}]</span>` : ''}${c.name}
+                  </span>
                 </div>
                 <div class="text-right shrink-0 font-mono text-[11px] text-blue-600 dark:text-blue-400 font-semibold ml-2">
                   ${c.slots.join('+')} (${c.linkedParentId ? 'incl.' : c.credits + 'c'})
@@ -1675,150 +1686,299 @@
       document.getElementById('compare-modal').classList.add('hidden');
     };
 
-    // --- Image Capture via html2canvas (full-width, unclipped timetable) ---
-    document.getElementById('btn-capture').onclick = async () => {
-      const captureArea = document.getElementById('timetable-capture-area');
-      const captureButton = document.getElementById('btn-capture');
-      const draft = getActiveDraft();
-      const isDark = document.documentElement.classList.contains('dark');
-      const originalBtnHtml = captureButton.innerHTML;
+    // --- Native 2D Canvas PNG Renderer (Zero Clipping / Only Course Name in Cells) ---
+    function wrapCanvasText(ctx, text, maxWidth) {
+      const words = String(text || '').split(/\s+/);
+      const lines = [];
+      let currentLine = '';
 
-      // Capture an isolated clone so the live timetable and its scroll position
-      // are never changed while the PNG is being generated.
-      let captureHost;
-      captureButton.disabled = true;
-      captureButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
-
-      try {
-        if (document.fonts && document.fonts.ready) {
-          await document.fonts.ready;
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        const testLine = currentLine ? currentLine + ' ' + word : word;
+        if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
         }
-
-        const table = captureArea.querySelector('table');
-        const captureWidth = Math.ceil(Math.max(
-          table ? table.scrollWidth : 0,
-          captureArea.scrollWidth,
-          captureArea.clientWidth
-        ));
-
-        captureHost = document.createElement('div');
-        captureHost.style.cssText = [
-          'position: fixed',
-          'left: -100000px',
-          'top: 0',
-          'z-index: -1',
-          'width: ' + captureWidth + 'px',
-          'background: ' + (isDark ? '#0f172a' : '#ffffff'),
-          'overflow: visible'
-        ].join(';');
-
-        const clone = captureArea.cloneNode(true);
-        clone.style.cssText +=
-          ';width:' + captureWidth + 'px;max-width:none;min-width:0;' +
-          'height:auto;overflow:visible;box-sizing:border-box;';
-
-        // html2canvas can miscalculate percentage-height flex content inside
-        // fixed-height table cells. Give the exported copy enough room and let
-        // course/faculty text wrap instead of being cut off.
-        const captureStyles = document.createElement('style');
-        captureStyles.textContent = `
-          #timetable-capture-area table {
-            width: ${captureWidth - 16}px !important;
-            min-width: ${captureWidth - 16}px !important;
-            table-layout: fixed !important;
-          }
-          #timetable-capture-area .slot-cell {
-            height: 112px !important;
-            min-height: 112px !important;
-            max-height: none !important;
-            overflow: visible !important;
-          }
-          #timetable-capture-area .slot-cell > div {
-            height: auto !important;
-            min-height: 100% !important;
-            overflow: visible !important;
-            justify-content: space-between !important;
-            padding: 7px 6px !important;
-          }
-          #timetable-capture-area .slot-cell > div > div:nth-child(2) {
-            flex: 0 0 auto !important;
-            min-height: 0 !important;
-            margin: 5px 0 !important;
-            line-height: 1.25 !important;
-            overflow: visible !important;
-            white-space: normal !important;
-          }
-          #timetable-capture-area .slot-cell > div > div:nth-child(2) > div {
-            white-space: normal !important;
-            overflow: visible !important;
-            text-overflow: clip !important;
-            overflow-wrap: anywhere !important;
-            max-height: 2.5em !important;
-          }
-          #timetable-capture-area .slot-cell > div > div:nth-child(2) > div + div {
-            white-space: normal !important;
-            overflow: visible !important;
-            text-overflow: clip !important;
-            overflow-wrap: anywhere !important;
-            max-height: 2.5em !important;
-          }
-        `;
-
-        clone.prepend(captureStyles);
-        captureHost.appendChild(clone);
-        document.body.appendChild(captureHost);
-
-        // Allow the browser to complete layout of the off-screen clone.
-        await new Promise(resolve => requestAnimationFrame(() =>
-          requestAnimationFrame(resolve)
-        ));
-
-        const canvas = await html2canvas(clone, {
-          scale: 2,
-          backgroundColor: isDark ? '#0f172a' : '#ffffff',
-          useCORS: true,
-          logging: false,
-          width: captureWidth,
-          windowWidth: Math.max(window.innerWidth, captureWidth),
-          height: clone.scrollHeight,
-          onclone: clonedDocument => {
-            clonedDocument.documentElement.classList.toggle('dark', isDark);
-          }
-        });
-
-        const link = document.createElement('a');
-        link.download = `${draft.name.replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, '_')}_FFCS_Timetable.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-      } catch (err) {
-        console.error('Capture failed:', err);
-        alert('Failed to capture image. Please try again.');
-      } finally {
-        if (captureHost && captureHost.parentNode) {
-          captureHost.parentNode.removeChild(captureHost);
-        }
-        captureButton.disabled = false;
-        captureButton.innerHTML = originalBtnHtml;
       }
-    };
+      if (currentLine) lines.push(currentLine);
+      return lines;
+    }
 
-    // --- Theme Switcher ---
+    function truncateCanvasText(ctx, text, maxWidth) {
+      let str = String(text || '');
+      if (ctx.measureText(str).width <= maxWidth) return str;
+      while (str.length > 0 && ctx.measureText(str + '…').width > maxWidth) {
+        str = str.slice(0, -1);
+      }
+      return str + '…';
+    }
+
+    function exportTimetableToPNG() {
+      const draft = getActiveDraft();
+      const visibleDays = getVisibleDays();
+      const isDark = document.documentElement.classList.contains('dark');
+
+      const slotCourseMap = {};
+      draft.courses.forEach(c => {
+        c.slots.forEach(s => {
+          slotCourseMap[s.toUpperCase()] = c;
+        });
+      });
+
+      const scale = 2; // Crisp Retina 2x resolution
+      const pad = 20;
+      const dayColW = 84;
+      const lunchColW = 54;
+      const slotColW = 112;
+      const totalColsW = dayColW + (slotColW * 12) + lunchColW;
+      const canvasW = totalColsW + (pad * 2);
+
+      const titleBarH = 46;
+      const hdrRow1H = 28;
+      const hdrRow2H = 26;
+      const hdrRow3H = 26;
+      const headerTotalH = hdrRow1H + hdrRow2H + hdrRow3H;
+      const dayRowH = 98;
+      const canvasH = pad * 2 + titleBarH + headerTotalH + (visibleDays.length * dayRowH);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = canvasW * scale;
+      canvas.height = canvasH * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(scale, scale);
+
+      // Palette
+      const bgCanvas = isDark ? '#020617' : '#ffffff';
+      const borderCol = isDark ? '#334155' : '#cbd5e1';
+      const hdrBg1 = isDark ? '#1e293b' : '#eff6ff';
+      const hdrBg2 = isDark ? '#1e293b' : '#f8fafc';
+      const hdrText = isDark ? '#e2e8f0' : '#334155';
+      const hdrAccent = isDark ? '#93c5fd' : '#1e40af';
+      const lunchHdrBg = isDark ? '#451a03' : '#fffbeb';
+      const lunchBodyBg = isDark ? '#3b1806' : '#fef3c7';
+      const lunchText = isDark ? '#fde68a' : '#78350f';
+      const dayBg = isDark ? '#1e293b' : '#f8fafc';
+      const emptyCellBg = isDark ? '#0f172a' : '#ffffff';
+      const emptySlotTxt = isDark ? '#64748b' : '#94a3b8';
+
+      ctx.fillStyle = bgCanvas;
+      ctx.fillRect(0, 0, canvasW, canvasH);
+
+      let curY = pad;
+      const startX = pad;
+
+      // 1. Top Navy Banner
+      ctx.fillStyle = '#0d2847';
+      ctx.fillRect(startX, curY, totalColsW, titleBarH);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '800 16px Inter, sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      ctx.fillText(draft.name.toUpperCase(), startX + 16, curY + titleBarH / 2);
+
+      const totalCredits = draft.courses.reduce((acc, c) => acc + (c.linkedParentId ? 0 : (parseInt(c.credits) || 0)), 0);
+      const effectiveCourseCount = draft.courses.filter(c => !c.linkedParentId).length;
+      ctx.font = '700 13px Inter, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#bfdbfe';
+      ctx.fillText(`Total Credits: ${totalCredits}   |   Courses: ${effectiveCourseCount}`, startX + totalColsW - 16, curY + titleBarH / 2);
+
+      curY += titleBarH;
+
+      function drawCell(x, y, w, h, fill) {
+        ctx.fillStyle = fill;
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = borderCol;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, w, h);
+      }
+
+      // 2. Table Headers
+      drawCell(startX, curY, dayColW, headerTotalH, hdrBg1);
+      ctx.fillStyle = hdrText;
+      ctx.font = '800 12px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('TIMINGS', startX + dayColW / 2, curY + headerTotalH / 2);
+
+      const morningX = startX + dayColW;
+      const morningW = slotColW * 6;
+      drawCell(morningX, curY, morningW, hdrRow1H, hdrBg1);
+      ctx.fillStyle = hdrAccent;
+      ctx.font = '700 11px Inter, sans-serif';
+      ctx.fillText('MORNING SLOTS (THEORY / LAB)', morningX + morningW / 2, curY + hdrRow1H / 2);
+
+      const lunchX = morningX + morningW;
+      drawCell(lunchX, curY, lunchColW, hdrRow1H, lunchHdrBg);
+      ctx.fillStyle = lunchText;
+      ctx.font = '800 10px Inter, sans-serif';
+      ctx.fillText('BREAK', lunchX + lunchColW / 2, curY + hdrRow1H / 2);
+
+      const afternoonX = lunchX + lunchColW;
+      const afternoonW = slotColW * 6;
+      drawCell(afternoonX, curY, afternoonW, hdrRow1H, hdrBg1);
+      ctx.fillStyle = hdrAccent;
+      ctx.font = '700 11px Inter, sans-serif';
+      ctx.fillText('AFTERNOON / EVENING SLOTS (THEORY / LAB)', afternoonX + afternoonW / 2, curY + hdrRow1H / 2);
+
+      const r2Y = curY + hdrRow1H;
+      const r3Y = r2Y + hdrRow2H;
+
+      for (let p = 0; p < 12; p++) {
+        const colX = p < 6 ? morningX + (p * slotColW) : afternoonX + ((p - 6) * slotColW);
+
+        drawCell(colX, r2Y, slotColW, hdrRow2H, hdrBg2);
+        ctx.fillStyle = hdrText;
+        ctx.font = '600 10px Inter, sans-serif';
+        ctx.fillText('Th: ' + PERIOD_TIMINGS_12H[p], colX + slotColW / 2, r2Y + hdrRow2H / 2);
+
+        drawCell(colX, r3Y, slotColW, hdrRow3H, hdrBg2);
+        ctx.fillStyle = hdrText;
+        ctx.font = '500 10px Inter, sans-serif';
+        ctx.fillText('Lab: ' + LAB_TIMINGS_12H[p], colX + slotColW / 2, r3Y + hdrRow3H / 2);
+      }
+
+      drawCell(lunchX, r2Y, lunchColW, hdrRow2H, lunchHdrBg);
+      ctx.fillStyle = lunchText;
+      ctx.font = '700 9.5px Inter, sans-serif';
+      ctx.fillText('1:25-2:00', lunchX + lunchColW / 2, r2Y + hdrRow2H / 2);
+
+      drawCell(lunchX, r3Y, lunchColW, hdrRow3H, lunchHdrBg);
+      ctx.fillText('1:20-2:00', lunchX + lunchColW / 2, r3Y + hdrRow3H / 2);
+
+      curY += headerTotalH;
+      const bodyStartY = curY;
+
+      // 3. Days & Slot Cells (Displays Course Name only, never Course Code)
+      visibleDays.forEach((day, dIdx) => {
+        const rowY = bodyStartY + (dIdx * dayRowH);
+
+        drawCell(startX, rowY, dayColW, dayRowH, dayBg);
+        ctx.fillStyle = hdrText;
+        ctx.font = '800 12px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(day, startX + dayColW / 2, rowY + dayRowH / 2);
+
+        const periods = SLOT_MATRIX[day];
+
+        for (let p = 0; p < 12; p++) {
+          const colX = p < 6 ? morningX + (p * slotColW) : afternoonX + ((p - 6) * slotColW);
+          const slotObj = periods[p];
+          const thSlot = slotObj.th;
+          const lbSlot = slotObj.lb;
+          const occupied = slotCourseMap[thSlot.toUpperCase()] || slotCourseMap[lbSlot.toUpperCase()];
+
+          if (occupied) {
+            const bg = occupied.color || '#c8f338';
+            const fg = getContrastColor(bg);
+            drawCell(colX, rowY, slotColW, dayRowH, bg);
+
+            const matchedSlot = occupied.slots.find(s => s.toUpperCase() === thSlot.toUpperCase() || s.toUpperCase() === lbSlot.toUpperCase()) || thSlot;
+            const typeLabel = occupied.type === 'Theory' ? 'THEORY' : 'LAB';
+
+            ctx.fillStyle = fg;
+            ctx.font = '700 10px monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText(matchedSlot, colX + 6, rowY + 6);
+
+            if (occupied.venue) {
+              ctx.font = '600 9.5px Inter, sans-serif';
+              ctx.textAlign = 'right';
+              const vText = truncateCanvasText(ctx, occupied.venue, slotColW - 44);
+              ctx.fillText(vText, colX + slotColW - 6, rowY + 6);
+            }
+
+            ctx.font = '800 12px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            const innerW = slotColW - 12;
+            let nameLines = wrapCanvasText(ctx, occupied.name, innerW);
+            if (nameLines.length > 2) {
+              nameLines = [nameLines[0], truncateCanvasText(ctx, nameLines.slice(1).join(' '), innerW)];
+            }
+
+            let textY = rowY + 25;
+            nameLines.forEach(line => {
+              ctx.fillText(line, colX + 6, textY);
+              textY += 15;
+            });
+
+            if (occupied.faculty) {
+              ctx.font = '600 10px Inter, sans-serif';
+              const facLine = truncateCanvasText(ctx, occupied.faculty, innerW);
+              ctx.fillText(facLine, colX + 6, textY + 2);
+            }
+
+            ctx.font = '800 8.5px Inter, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(typeLabel, colX + slotColW - 6, rowY + dayRowH - 5);
+          } else {
+            drawCell(colX, rowY, slotColW, dayRowH, emptyCellBg);
+            ctx.fillStyle = emptySlotTxt;
+            ctx.font = '700 11px monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText(thSlot, colX + 6, rowY + 6);
+
+            ctx.font = '700 10px monospace';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(lbSlot, colX + slotColW - 6, rowY + dayRowH - 6);
+          }
+        }
+      });
+
+      // 4. Single Merged Vertical LUNCH Column
+      const totalBodyH = visibleDays.length * dayRowH;
+      drawCell(lunchX, bodyStartY, lunchColW, totalBodyH, lunchBodyBg);
+      ctx.fillStyle = lunchText;
+      ctx.font = '900 13px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const lunchLetters = ['L', 'U', 'N', 'C', 'H'];
+      const letterSpacing = 24;
+      const startLetterY = bodyStartY + (totalBodyH / 2) - ((lunchLetters.length - 1) * letterSpacing) / 2;
+      lunchLetters.forEach((ch, idx) => {
+        ctx.fillText(ch, lunchX + lunchColW / 2, startLetterY + idx * letterSpacing);
+      });
+
+      const link = document.createElement('a');
+      link.download = `${draft.name.replace(/\s+/g, '_')}_FFCS_Timetable.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    document.getElementById('btn-capture').onclick = exportTimetableToPNG;
+
+    // --- Togglable Theme Switcher ---
     function applyTheme(theme) {
       const html = document.documentElement;
-      const icon = document.getElementById('theme-icon');
+      const checkbox = document.getElementById('theme-toggle-checkbox');
+      const thumb = document.getElementById('theme-switch-thumb');
+      const thumbIcon = document.getElementById('theme-thumb-icon');
+
       if (theme === 'dark') {
         html.classList.add('dark');
-        icon.className = 'fa-solid fa-sun';
+        checkbox.checked = true;
+        thumb.style.transform = 'translateX(28px)';
+        thumbIcon.className = 'fa-solid fa-moon text-[10px] text-indigo-600';
       } else {
         html.classList.remove('dark');
-        icon.className = 'fa-solid fa-moon';
+        checkbox.checked = false;
+        thumb.style.transform = 'translateX(0px)';
+        thumbIcon.className = 'fa-solid fa-sun text-[10px] text-amber-500';
       }
       appState.theme = theme;
       saveState();
     }
 
-    document.getElementById('btn-theme-toggle').onclick = () => {
-      const newTheme = appState.theme === 'dark' ? 'light' : 'dark';
+    document.getElementById('theme-toggle-checkbox').onchange = (e) => {
+      const newTheme = e.target.checked ? 'dark' : 'light';
       applyTheme(newTheme);
       renderGrid();
     };
